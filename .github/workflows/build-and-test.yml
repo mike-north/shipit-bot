@@ -1,4 +1,4 @@
-name: CI
+name: Test Pull Requests
 
 on: [pull-request]
 
@@ -21,4 +21,3 @@ jobs:
         run: |
           yarn
           yarn test
-

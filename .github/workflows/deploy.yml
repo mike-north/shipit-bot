@@ -3,6 +3,8 @@ on:
     branches:
       - master
 
+name: Test and Deploy
+
 jobs:
   test:
     name: Test
