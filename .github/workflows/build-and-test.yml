@@ -1,6 +1,6 @@
 name: CI
 
-on: [push]
+on: [pull-request]
 
 jobs:
   test:
@@ -21,3 +21,4 @@ jobs:
         run: |
           yarn
           yarn test
+
