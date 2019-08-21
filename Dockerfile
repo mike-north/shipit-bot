@@ -16,6 +16,6 @@ RUN yarn
 # Bundle app source
 COPY . .
 
-EXPOSE 8080
-ENV PORT 8080
+EXPOSE 80
+ENV PORT 80
 CMD ["yarn", "probot", "run", "./dist/index.js"]
