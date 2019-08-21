@@ -21,9 +21,9 @@
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {
-    "nock": "^10.0.0",
     "@types/nock": "^9.3.0",
-    "probot": "^7.2.0"
+    "nock": "^10.0.0",
+    "probot": "^9.3.2"
   },
   "devDependencies": {
     "@types/jest": "^24.0.0",
@@ -31,6 +31,7 @@
     "eslint-plugin-typescript": "^0.14.0",
     "jest": "^24.0.0",
     "nodemon": "^1.17.2",
+    "smee": "^0.2.0",
     "smee-client": "^1.0.2",
     "standard": "^12.0.1",
     "ts-jest": "^24.0.0",
