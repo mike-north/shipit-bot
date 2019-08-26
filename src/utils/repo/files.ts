@@ -1,5 +1,6 @@
 import { GitHubAPI } from "probot/lib/github";
 import { gql } from "../../utils/gql";
+import { IFile } from "../../types";
 
 /**
  * GraphQL expression for retrieving a set of files (and their content)
@@ -30,14 +31,6 @@ const REPO_FILES_GQL_EXTENSION = gql`
 `;
 
 /**
- * A text file, with a file name and some text content
- */
-export interface ITextFile {
-  name: string;
-  content: string;
-}
-
-/**
  * For a given repo and ref (commit, branch, sha), search for
  * filenames that match a given path expression
  *
@@ -55,7 +48,7 @@ export async function getRepoTextFiles(
   repo: string,
   ref: string,
   path: string
-): Promise<ITextFile[]> {
+): Promise<IFile<string>[]> {
   const {
     repository: {
       content: { entries }
