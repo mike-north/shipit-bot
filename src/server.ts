@@ -1,15 +1,14 @@
 import { Application } from 'probot'; // eslint-disable-line no-unused-vars
+import { updateAclStatus } from './event-handlers/pr/acl';
+import { debounce } from './utils/debounce';
 
 export = (app: Application): void => {
-  app.on('issues.opened', async context => {
-    const issueComment = context.issue({
-      body: 'Thanks for opening this issue!',
-    });
-    await context.github.issues.createComment(issueComment);
+  app.on(`*`, async context => {
+    context.log({ event: context.event, action: context.payload.action });
   });
-  // For more information on building apps:
-  // https://probot.github.io/docs/
 
-  // To get your app running against GitHub, see:
-  // https://probot.github.io/docs/development/
+  app.on(
+    ['pull_request', 'pull_request.edited'],
+    debounce(updateAclStatus, 100),
+  );
 };
