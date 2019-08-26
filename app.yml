@@ -15,37 +15,37 @@
 default_events:
   - check_run
   - check_suite
-  - commit_comment
-  - create
-  - delete
-  - deployment
-  - deployment_status
-  - fork
-  - gollum
+  # - commit_comment
+  # - create
+  # - delete
+  # - deployment
+  # - deployment_status
+  # - fork
+  # - gollum
   - issue_comment
   - issues
   - label
-  - milestone
-  - member
-  - membership
-  - org_block
-  - organization
-  - page_build
-  - project
-  - project_card
-  - project_column
-  - public
+  # - milestone
+  # - member
+  # - membership
+  # - org_block
+  # - organization
+  # - page_build
+  # - project
+  # - project_card
+  # - project_column
+  # - public
   - pull_request
   - pull_request_review
   - pull_request_review_comment
-  - push
-  - release
-  - repository
-  - repository_import
+  # - push
+  # - release
+  # - repository
+  # - repository_import
   - status
-  - team
-  - team_add
-  - watch
+  # - team
+  # - team_add
+  # - watch
 
 # The set of permissions needed by the GitHub App. The format of the object uses
 # the permission name for the key (for example, issues) and the access type for
@@ -58,7 +58,7 @@ default_permissions:
 
   # Checks on code.
   # https://developer.github.com/v3/apps/permissions/#permission-on-checks
-  # checks: read
+  checks: write
 
   # Repository contents, commits, branches, downloads, releases, and merges.
   # https://developer.github.com/v3/apps/permissions/#permission-on-contents

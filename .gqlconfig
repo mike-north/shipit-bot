@@ -1,0 +1,13 @@
+{
+  schema: {
+    files: "src/schemas/**/*.{graphql,gql}"
+  },
+  query: {
+    files: [
+      {
+        match: "node_modules/@oktokit/graphql-schema/schema.graphql",
+        parser: "QueryParser"
+      }
+    ]
+  }
+}
