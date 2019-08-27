@@ -22,7 +22,7 @@
     "start": "probot run ./lib/index.js",
     "lint": "standard **/*.ts --fix",
     "pretest": "tsc -b test",
-    "test": "qunit test-js/**/*.test.js",
+    "test": "qunit test-js/test/**/*.test.js",
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
   },
   "dependencies": {
