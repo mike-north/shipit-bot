@@ -2,7 +2,7 @@ import { Application } from 'probot'; // eslint-disable-line no-unused-vars
 import { updateAclStatus } from './event-handlers/pr/acl';
 import { debounce } from './utils/debounce';
 
-const STANDARD_DEBOUNCE = 100; // ms
+const STANDARD_DEBOUNCE = 1000; // ms
 
 export = (app: Application): void => {
   app.on(`*`, async context => {

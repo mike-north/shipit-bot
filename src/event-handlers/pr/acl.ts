@@ -1,6 +1,54 @@
 import { Context } from "probot";
 import Webhooks = require("@octokit/webhooks");
-import { getAclsForRepo } from "../../utils/repo/acl";
+import {
+  getAclsForRepo,
+  getAclShipitStatusForCommits
+} from "../../utils/repo/acl";
+import { getCommitHistoryForPullRequest } from "../../utils/repo/pull-request";
+import { getFileChangesForCommits } from "../../utils/repo/commits";
+import { getReviewsForPullRequest } from "../../utils/reviews";
+
+export async function updateAclStatus(
+  context: Context<Webhooks.WebhookPayloadPullRequest>
+) {
+  const {
+    github,
+    payload: { pull_request }
+  } = context;
+  const repoData = context.repo();
+  const { owner, repo } = repoData;
+  // Get the ACLs pertaining to this repo
+  const pAcls = getAclsForRepo(github, owner, repo);
+  const pReviews = getReviewsForPullRequest(
+    github,
+    owner,
+    repo,
+    pull_request.number
+  );
+  // Get the list of commit SHAs included with this PR
+  const pCommits = getCommitHistoryForPullRequest(
+    github,
+    owner,
+    repo,
+    pull_request.number
+  );
+
+  // For our list of commits, obtain data around which files were changed
+  const pCommitData = getFileChangesForCommits(
+    github,
+    owner,
+    repo,
+    await pCommits
+  );
+  console.log("getting ship-it statuese");
+  const shipitStatus = await getAclShipitStatusForCommits(
+    github,
+    await pAcls,
+    await pCommitData,
+    await pReviews
+  );
+  console.log(JSON.stringify(shipitStatus, null, "  "));
+}
 
 // async function forceOverrides(
 //   context: Context<Webhooks.WebhookPayloadPullRequest>
@@ -39,27 +87,6 @@ import { getAclsForRepo } from "../../utils/repo/acl";
 //     await forceOverrides(context);
 //   }
 // }
-
-export async function updateAclStatus(
-  context: Context<Webhooks.WebhookPayloadPullRequest>
-) {
-  const {
-    github,
-    payload: { pull_request }
-  } = context;
-  const repoData = context.repo();
-  const { owner, repo } = repoData;
-  // Get the ACLs pertaining to this repo
-  const acls = await getAclsForRepo(github, owner, repo);
-
-  // console.log(acls);
-  const commitList = await github.pulls.listCommits({
-    pull_number: pull_request.number,
-    repo,
-    owner
-  });
-  console.log(JSON.stringify(commitList.data.map(c => c.sha), null, "  "));
-}
 
 //   const issueComment = context.issue({
 //     body: "Thanks for editing this PR!"

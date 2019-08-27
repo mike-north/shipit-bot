@@ -1,7 +1,13 @@
 import * as yml from "js-yaml";
 import { GitHubAPI } from "probot/lib/github";
 import { getRepoTextFiles } from "./files";
-import { IOwnerAcl, IReleaseOwnerAcl, Acl, IFile } from "../../types";
+import { Acl, IFile, ICommitWithFileChanges } from "../../types";
+import { PullsListReviewsResponseItem } from "@octokit/rest";
+import OwnerAcl, { IOwnerAcl } from "../../models/acl/owner";
+import ReleaseOwnerAcl, {
+  IReleaseOwnerAcl
+} from "../../models/acl/release-owner";
+import AclBase from "../../models/acl/base";
 
 /**
  * Parse a corretly formatted string into an {@link ACL} data structure
@@ -31,7 +37,7 @@ function parseAcl(fileContents: string): Acl {
 
   if (owners) {
     // owner ACL
-    return {
+    return new OwnerAcl({
       owners,
       paths,
       whitelist,
@@ -39,10 +45,10 @@ function parseAcl(fileContents: string): Acl {
       groups,
       block_message,
       description
-    };
+    });
   } else if (release_owners) {
     // release owner ACL
-    return {
+    return new ReleaseOwnerAcl({
       release_owners,
       paths,
       whitelist,
@@ -50,7 +56,7 @@ function parseAcl(fileContents: string): Acl {
       groups,
       block_message,
       description
-    };
+    });
   } else throw new Error(`Invalid ACL file: \n${JSON.stringify(aclData)}`);
 }
 
@@ -75,4 +81,77 @@ export async function getAclsForRepo(
   }));
 
   return acls;
+}
+
+/**
+ * For a list of files (probably those changed in a commit or PR),
+ * determine which ACLs will require a ship-it
+ *
+ * @param repoAclFiles ACL files found in a repo
+ * @param fileNames names of files touched in a code change
+ */
+function getOwnerAclsForFiles(
+  repoAclFiles: IFile<Acl>[],
+  fileNames: string[]
+): IFile<OwnerAcl>[] {
+  // return an array of those ACLs that match
+  return [
+    ...repoAclFiles.reduce((set, acl) => {
+      // check whether this ACL applies to any files
+      const applies = fileNames.reduce((doesApply, file) => {
+        // if we already found this ACL to be relevant, don't even bother checking
+        if (doesApply) return true;
+        // this ACL may or may not be relevant, we need to check against the file path
+        return acl.content.appliesToFile(file);
+      }, false);
+      // If we have determined this ACL to be relevant
+      const { content } = acl;
+      if (applies && content.kind === "owner") set.add({ ...acl, content }); // add it to the set
+      return set;
+    }, new Set<IFile<OwnerAcl>>())
+  ];
+}
+
+function isOwnerAcl(acl: AclBase & Partial<OwnerAcl>): acl is OwnerAcl {
+  return typeof acl.owners !== "undefined";
+}
+
+function isOwnerAclFile(
+  file: IFile<AclBase & Partial<OwnerAcl>>
+): file is IFile<AclBase & Partial<OwnerAcl>> {
+  return typeof file.content.owners !== "undefined";
+}
+
+export async function getAclShipitStatusForCommits(
+  github: GitHubAPI,
+  repoAclFiles: IFile<Acl>[],
+  commits: ICommitWithFileChanges[],
+  existingReviews: PullsListReviewsResponseItem[]
+) {
+  const commitAcls = commits.map(c => {
+    const commitFiles = c.files.map(f => f.filename);
+    const acls = getOwnerAclsForFiles(repoAclFiles, commitFiles);
+    return {
+      commit: c,
+      acls
+    };
+  });
+
+  const reviewData = existingReviews.map(({ state, user, commit_id }) => ({
+    state,
+    user,
+    commit_id
+  }));
+  console.log("Existing Reviews:\n", JSON.stringify(reviewData, null, "  "));
+
+  commitAcls.forEach(cacl => {
+    console.log(
+      `Commit: ${cacl.commit.sha}\n${JSON.stringify(
+        cacl.acls.map(({ name, content: { owners } }) => ({ name, owners })),
+        null,
+        "  "
+      )}`
+    );
+  });
+  return [];
 }
