@@ -1,5 +1,5 @@
-import OwnerAcl, { IOwnerAcl } from "../models/acl/owner";
-import ReleaseOwnerAcl, { IReleaseOwnerAcl } from "../models/acl/release-owner";
+import OwnerAcl, { IOwnerAcl } from '../models/acl/owner';
+import ReleaseOwnerAcl, { IReleaseOwnerAcl } from '../models/acl/release-owner';
 
 /**
  * Either be an "owner ACL" or a "release owner ACL"

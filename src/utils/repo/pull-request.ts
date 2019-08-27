@@ -1,4 +1,4 @@
-import { GitHubAPI } from "probot/lib/github";
+import { GitHubAPI } from 'probot/lib/github';
 
 /**
  * Get the list of commit SHAs that relate to a specified pull request
@@ -9,15 +9,15 @@ import { GitHubAPI } from "probot/lib/github";
  * @param pull_number pull request number
  */
 export async function getCommitHistoryForPullRequest(
-  github: GitHubAPI,
+  github: { pulls: Pick<GitHubAPI['pulls'], 'listCommits'> },
   owner: string,
   repo: string,
-  pull_number: number
+  pull_number: number,
 ): Promise<string[]> {
   const { data: commitList } = await github.pulls.listCommits({
     pull_number,
     repo,
-    owner
+    owner,
   });
   return commitList.map(c => c.sha);
 }

@@ -20,14 +20,14 @@ export default abstract class AclBase implements IAclBase {
   description?: string;
   block_message?: string;
   groups?: string[];
-  public abstract kind: "owner" | "release_owner";
+  public abstract kind: 'owner' | 'release_owner';
 
   protected pathRegexes: RegExp[];
 
   protected constructor(arg: IAclBase) {
     this.paths = arg.paths;
     if (arg.paths.length === 0)
-      throw new Error("Paths invalid: " + JSON.stringify(arg, null, "  "));
+      throw new Error('Paths invalid: ' + JSON.stringify(arg, null, '  '));
     if (arg.whitelist) this.whitelist = arg.whitelist;
     if (arg.exclude_paths) this.exclude_paths = arg.exclude_paths;
     if (arg.description) this.description = arg.description;
