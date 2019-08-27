@@ -1,6 +1,6 @@
 {
   "name": "shipit-bot",
-  "version": "1.0.0",
+  "version": "0.0.0",
   "description": "ACL bot",
   "author": "Mike North <michael.l.north@gmail.com> (https://mike.works)",
   "license": "BSD-2-Clause",
@@ -64,5 +64,9 @@
   },
   "jest": {
     "testEnvironment": "node"
+  },
+  "volta": {
+    "node": "12.9.1",
+    "yarn": "1.17.3"
   }
 }
