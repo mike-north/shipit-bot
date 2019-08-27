@@ -1,6 +1,6 @@
-import { GitHubAPI } from "probot/lib/github";
-import { gql } from "../../utils/gql";
-import { IFile } from "../../types";
+import { GitHubAPI } from 'probot/lib/github';
+import { gql } from '../../utils/gql';
+import { IFile } from '../../types';
 
 /**
  * GraphQL expression for retrieving a set of files (and their content)
@@ -43,23 +43,23 @@ const REPO_FILES_GQL_EXTENSION = gql`
  * @private
  */
 export async function getRepoTextFiles(
-  github: GitHubAPI,
+  github: Pick<GitHubAPI, 'graphql'>,
   owner: string,
   repo: string,
   ref: string,
-  path: string
+  path: string,
 ): Promise<IFile<string>[]> {
   const {
     repository: {
-      content: { entries }
-    }
+      content: { entries },
+    },
   } = (await github.graphql(REPO_FILES_GQL_EXTENSION, {
     owner,
     repo,
-    expression: `${ref}:${path}`
+    expression: `${ref}:${path}`,
   })) as any;
   return entries.map((e: any) => ({
     name: e.name,
-    content: e.object.text
+    content: e.object.text,
   }));
 }

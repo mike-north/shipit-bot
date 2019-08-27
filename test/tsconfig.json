@@ -3,7 +3,8 @@
   "compilerOptions": {
     "module": "commonjs",
     "outDir": "../test-js",
-    "declaration": false
+    "declaration": false,
+    "baseUrl": "."
   },
   "include": ["."]
 }

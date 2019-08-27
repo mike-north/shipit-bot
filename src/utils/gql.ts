@@ -3,5 +3,5 @@ export function gql(strings: TemplateStringsArray, ...others: any[]) {
   for (let i = 0; i < others.length; i++) {
     out.push(others[i], strings[i + 1]);
   }
-  return out.join("");
+  return out.join('');
 }

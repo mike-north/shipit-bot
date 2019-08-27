@@ -1,19 +1,19 @@
-import { Context } from "probot";
-import Webhooks = require("@octokit/webhooks");
+import { Context } from 'probot';
+import Webhooks = require('@octokit/webhooks');
 import {
   getAclsForRepo,
-  getAclShipitStatusForCommits
-} from "../../utils/repo/acl";
-import { getCommitHistoryForPullRequest } from "../../utils/repo/pull-request";
-import { getFileChangesForCommits } from "../../utils/repo/commits";
-import { getReviewsForPullRequest } from "../../utils/reviews";
+  getAclShipitStatusForCommits,
+} from '../../utils/repo/acl';
+import { getCommitHistoryForPullRequest } from '../../utils/repo/pull-request';
+import { getFileChangesForCommits } from '../../utils/repo/commits';
+import { getReviewsForPullRequest } from '../../utils/reviews';
 
 export async function updateAclStatus(
-  context: Context<Webhooks.WebhookPayloadPullRequest>
+  context: Context<Webhooks.WebhookPayloadPullRequest>,
 ) {
   const {
     github,
-    payload: { pull_request }
+    payload: { pull_request },
   } = context;
   const repoData = context.repo();
   const { owner, repo } = repoData;
@@ -23,14 +23,14 @@ export async function updateAclStatus(
     github,
     owner,
     repo,
-    pull_request.number
+    pull_request.number,
   );
   // Get the list of commit SHAs included with this PR
   const pCommits = getCommitHistoryForPullRequest(
     github,
     owner,
     repo,
-    pull_request.number
+    pull_request.number,
   );
 
   // For our list of commits, obtain data around which files were changed
@@ -38,16 +38,15 @@ export async function updateAclStatus(
     github,
     owner,
     repo,
-    await pCommits
+    await pCommits,
   );
-  console.log("getting ship-it statuese");
+  console.log('getting ship-it statuese');
   const shipitStatus = await getAclShipitStatusForCommits(
-    github,
     await pAcls,
     await pCommitData,
-    await pReviews
+    await pReviews,
   );
-  console.log(JSON.stringify(shipitStatus, null, "  "));
+  console.log(JSON.stringify(shipitStatus, null, '  '));
 }
 
 // async function forceOverrides(

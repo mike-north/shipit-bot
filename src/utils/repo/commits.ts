@@ -1,11 +1,11 @@
-import { GitHubAPI } from "probot/lib/github";
-import { ICommitWithFileChanges } from "../../types";
+import { GitHubAPI } from 'probot/lib/github';
+import { ICommitWithFileChanges } from '../../types';
 
 export async function getFileChangesForCommits(
-  github: GitHubAPI,
+  github: { repos: Pick<GitHubAPI['repos'], 'getCommit'> },
   owner: string,
   repo: string,
-  commitList: string[]
+  commitList: string[],
 ): Promise<ICommitWithFileChanges[]> {
   const commitDetails = await Promise.all(
     /**
@@ -25,7 +25,7 @@ export async function getFileChangesForCommits(
      */
     commitList.map(async sha => {
       const {
-        data: { files }
+        data: { files },
       } = await github.repos.getCommit({ repo, owner, ref: sha });
       return {
         sha,
@@ -35,11 +35,11 @@ export async function getFileChangesForCommits(
             status,
             additions,
             deletions,
-            changes
-          })
-        )
+            changes,
+          }),
+        ),
       };
-    })
+    }),
   );
   return commitDetails;
 }
