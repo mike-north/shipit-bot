@@ -4,14 +4,15 @@
   "description": "ACL bot",
   "author": "Mike North <michael.l.north@gmail.com> (https://mike.works)",
   "license": "BSD-2-Clause",
-  "repository": "https://github.com//shipit.git",
-  "homepage": "https://github.com//shipit",
-  "bugs": "https://github.com//shipit/issues",
+  "repository": "https://github.com/mike-north/shipit-bot.git",
+  "homepage": "https://github.com/mike-north/shipit-bot",
+  "bugs": "https://github.com/mike-north/shipit-bot/issues",
   "keywords": [
     "probot",
     "github",
     "probot-app"
   ],
+  "private": true,
   "scripts": {
     "clean": "rimraf lib test-js",
     "build": "tsc -p tsconfig.json",
