@@ -1,9 +1,12 @@
 import nock from 'nock';
+import { Probot } from 'probot';
+
 // Requiring our app implementation
 import myProbotApp from '../../src';
-import { Probot } from 'probot';
+
 // Requiring our fixtures
 import payload from './fixtures/issues.opened.json';
+
 const issueCreatedBody = { body: 'Thanks for opening this issue!' };
 
 nock.disableNetConnect();
@@ -17,7 +20,7 @@ QUnit.module('My Probot app', async hooks => {
     const app = probot.load(myProbotApp);
 
     // just return a test token
-    app.app.getSignedJsonWebToken = () => 'test';
+    app.app.getSignedJsonWebToken = (): string => 'test';
   });
 
   QUnit.test('creates a comment when an issue is opened', async assert => {

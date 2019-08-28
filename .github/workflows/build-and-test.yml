@@ -8,7 +8,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        node_version: [12]
+        node_version: [12, 10]
         os: [ubuntu-latest]
 
     steps:
@@ -20,4 +20,5 @@ jobs:
       - name: npm install, build and test
         run: |
           yarn
+          yarn lint
           yarn test

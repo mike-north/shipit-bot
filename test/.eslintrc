@@ -1,0 +1,7 @@
+{
+  "extends": "../.eslintrc",
+  "rules": { "func-names": 0 },
+  "globals": {
+    "QUnit": true
+  }
+}
