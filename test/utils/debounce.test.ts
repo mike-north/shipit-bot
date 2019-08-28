@@ -3,9 +3,8 @@ import { debounce } from '../../src/utils/debounce';
 QUnit.module('debounce tests', async function() {
   QUnit.test('immediate repeated invocations are debounced', async assert => {
     const done = assert.async();
-    const wm = new WeakMap();
     let invocationCount = 0;
-    function foo() {
+    function foo(): void {
       invocationCount++;
     }
     const debouncedFn = debounce(foo, 10);
@@ -20,9 +19,8 @@ QUnit.module('debounce tests', async function() {
 
   QUnit.test('async invocations are debounced', async assert => {
     const done = assert.async();
-    const wm = new WeakMap();
     let invocationCount = 0;
-    function foo() {
+    function foo(): void {
       invocationCount++;
     }
     const debouncedFn = debounce(foo, 15);

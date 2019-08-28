@@ -1,6 +1,6 @@
 import { Application } from 'probot'; // eslint-disable-line no-unused-vars
 
-export = (app: Application) => {
+export = (app: Application): void => {
   app.on('issues.opened', async context => {
     const issueComment = context.issue({
       body: 'Thanks for opening this issue!',

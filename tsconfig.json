@@ -19,6 +19,6 @@
     "resolveJsonModule": true,
     "downlevelIteration": true
   },
-  "include": ["src/**/*"],
+  "exclude": ["node_modules", "lib", "test-js", ".vscode", ".github"],
   "compileOnSave": false
 }
