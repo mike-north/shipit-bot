@@ -26,5 +26,19 @@
       // use <root>/tsconfig.json
       "typescript": {}
     }
-  }
+  },
+  "overrides": [
+    {
+      "files": "test/**/*.ts",
+      "parserOptions": {
+        "project": "./test/tsconfig.json"
+      },
+      "globals": {
+        "QUnit": true
+      },
+      "rules": {
+        "func-names": 0
+      }
+    }
+  ]
 }
