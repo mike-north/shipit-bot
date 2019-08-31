@@ -20,7 +20,7 @@
     "dev:watch": "yarn pm2 start ./lib/index.js --watch",
     "watch": "yarn concurrently \"npm:build:watch\" \"npm:dev:watch\" \"yarn pm2 log\" -n \"TS,PM,Log\" -c \"bgYellow.black,bgGreen.black,bgWhite.black\"",
     "start": "yarn pm2 start ./lib/index.js -i max",
-    "lint": "yarn eslint {src,test}/**/*.ts",
+    "lint": "yarn eslint src test --ext js,ts",
     "pretest": "yarn tsc -b test",
     "test": "yarn qunit test-js/test/**/*.test.js",
     "test:watch": "jest --watch --notify --notifyMode=change --coverage"
