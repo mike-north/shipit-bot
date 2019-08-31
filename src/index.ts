@@ -1,5 +1,5 @@
-import { Probot } from 'probot';
-import { join } from 'path';
+import { Probot, ApplicationFunction } from 'probot';
 
-process.stdout.write('starting...');
-Probot.run(['', '', join(__dirname, 'index.js')]);
+import appFn = require('./server');
+
+Probot.run(appFn as ApplicationFunction);
