@@ -1,4 +1,4 @@
-# shipit bot
+# shipit-bot
 
 A GitHub App that validates code reviews, as defined by one or more potentially overlapping `.acl` files
 
