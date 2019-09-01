@@ -14,8 +14,8 @@
     "outDir": "./lib",
     "skipLibCheck": true,
     "noImplicitAny": true,
-    "esModuleInterop": true,
     "declaration": false,
+    "esModuleInterop": true,
     "resolveJsonModule": true,
     "downlevelIteration": true
   },
