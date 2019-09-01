@@ -2,6 +2,7 @@
   "extends": "dtslint/dtslint.json",
   "rules": {
     "semicolon": true,
-    "indent": false
+    "indent": false,
+    "no-object-literal-type-assertion": false
   }
 }
