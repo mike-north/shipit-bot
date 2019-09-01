@@ -13,7 +13,13 @@
   "rules": {
     "import/prefer-default-export": 0,
     "@typescript-eslint/no-explicit-any": 0,
-    "no-plusplus": 0
+    "no-plusplus": 0,
+    "@typescript-eslint/camelcase": 0,
+    "@typescript-eslint/interface-name-prefix": [
+      "error",
+      { "prefixWithI": "always" }
+    ],
+    "no-restricted-syntax": 0
   },
   "settings": {
     "parser": "typescript-eslint-parser",

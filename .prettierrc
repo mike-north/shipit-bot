@@ -1,6 +1,7 @@
 {
   "singleQuote": true,
   "semi": true,
-  "quoteProps": "consistent",
+  "endOfLine": "auto",
+  "bracketSpacing": true,
   "trailingComma": "all"
 }
