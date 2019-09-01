@@ -1,32 +1,28 @@
 {
-  "name": "shipit-bot",
-  "version": "0.0.0",
-  "description": "ACL bot",
-  "author": "Mike North <michael.l.north@gmail.com> (https://mike.works)",
-  "license": "BSD-2-Clause",
-  "repository": "https://github.com/mike-north/shipit-bot.git",
-  "homepage": "https://github.com/mike-north/shipit-bot",
-  "bugs": "https://github.com/mike-north/shipit-bot/issues",
-  "keywords": [
-    "probot",
-    "github",
-    "probot-app"
-  ],
   "private": true,
+  "name": "shipit-bot",
+  "description": "ACL bot",
+  "license": "BSD-2-Clause",
+  "author": "Mike North <michael.l.north@gmail.com> (https://mike.works)",
+  "homepage": "https://github.com/mike-north/shipit-bot",
+  "repository": "https://github.com/mike-north/shipit-bot.git",
+  "bugs": "https://github.com/mike-north/shipit-bot/issues",
+  "version": "0.0.0",
   "scripts": {
-    "clean": "rimraf lib test-js",
     "build": "tsc -p tsconfig.json",
-    "build:watch": "tsc -p tsconfig.json --watch",
-    "dev:watch": "yarn pm2 start ./lib/index.js --watch",
-    "watch": "yarn concurrently \"npm:build:watch\" \"npm:dev:watch\" \"yarn pm2 log\" -n \"TS,PM,Log\" -c \"bgYellow.black,bgGreen.black,bgWhite.black\"",
-    "start": "yarn pm2 start ./lib/index.js -i max",
-    "lint": "yarn eslint src test --ext js,ts",
-    "pretest": "yarn tsc -b test",
-    "test": "yarn qunit test-js/test/**/*.test.js",
-    "test:watch": "jest --watch --notify --notifyMode=change --coverage"
+    "clean": "rimraf lib test-js",
+    "precommit": "yarn lint && prettier-package-json --write && prettier --write '{src,test}/**/*.ts'",
+    "lint": "eslint src test --ext js,ts",
+    "start": "pm2 start ./lib/index.js -i max",
+    "pretest": "tsc -b test",
+    "test": "qunit test-js/test/**/*.test.js",
+    "watch": "concurrently \"npm:watch:build\" \"npm:watch:dev\" \"yarn pm2 log\" -n \"TS,PM,Log\" -c \"bgYellow.black,bgGreen.black,bgWhite.black\"",
+    "watch:build": "tsc -p tsconfig.json --watch",
+    "watch:dev": "pm2 start ./lib/index.js --watch"
   },
   "dependencies": {
     "@octokit/rest": "^16.28.7",
+    "@octokit/webhooks": "^6.2.2",
     "debug": "^4.1.1",
     "js-yaml": "^3.13.1",
     "pm2": "^3.5.1",
@@ -36,6 +32,8 @@
     "@octokit/graphql-schema": "^6.31.1",
     "@playlyfe/gql": "^2.6.2",
     "@types/debug": "^4.1.5",
+    "@types/dotenv": "^6.1.1",
+    "@types/jest": "^24.0.0",
     "@types/js-yaml": "^3.12.1",
     "@types/nock": "^9.3.0",
     "@types/node": "^11.9.0",
@@ -49,7 +47,10 @@
     "eslint-import-resolver-typescript": "^1.1.1",
     "eslint-plugin-import": "^2.18.2",
     "eslint-plugin-typescript": "^0.14.0",
+    "husky": "^3.0.4",
     "nock": "^10.0.0",
+    "prettier": "^1.18.2",
+    "prettier-package-json": "^2.1.0",
     "qunit": "^2.9.2",
     "rimraf": "^3.0.0",
     "smee": "^0.2.0",
@@ -58,20 +59,18 @@
     "typescript": "^3.3.1",
     "typescript-eslint-parser": "^22.0.0"
   },
+  "keywords": [
+    "github",
+    "probot",
+    "probot-app"
+  ],
   "engines": {
-    "node": ">= 8.3.0"
+    "node": "10.* || >= 12"
   },
-  "standard": {
-    "parser": "typescript-eslint-parser",
-    "env": [
-      "jest"
-    ],
-    "plugins": [
-      "typescript"
-    ]
-  },
-  "jest": {
-    "testEnvironment": "node"
+  "husky": {
+    "hooks": {
+      "pre-commit": "yarn precommit"
+    }
   },
   "volta": {
     "node": "12.9.1",
