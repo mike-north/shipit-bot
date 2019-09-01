@@ -15,11 +15,17 @@ export interface IAclBase {
 
 export default abstract class AclBase implements IAclBase {
   whitelist?: string[];
+
   paths: string[] = [];
+
   exclude_paths?: string[];
+
   description?: string;
+
   block_message?: string;
+
   groups?: string[];
+
   public abstract kind: 'owner' | 'release_owner';
 
   protected pathRegexes: RegExp[];
@@ -27,7 +33,7 @@ export default abstract class AclBase implements IAclBase {
   protected constructor(arg: IAclBase) {
     this.paths = arg.paths;
     if (arg.paths.length === 0)
-      throw new Error('Paths invalid: ' + JSON.stringify(arg, null, '  '));
+      throw new Error(`Paths invalid: ${JSON.stringify(arg, null, '  ')}`);
     if (arg.whitelist) this.whitelist = arg.whitelist;
     if (arg.exclude_paths) this.exclude_paths = arg.exclude_paths;
     if (arg.description) this.description = arg.description;
@@ -37,7 +43,7 @@ export default abstract class AclBase implements IAclBase {
   }
 
   public appliesToFile(filePath: string): boolean {
-    for (let r of this.pathRegexes) {
+    for (const r of this.pathRegexes) {
       if (r.test(filePath)) return true;
     }
     return false;

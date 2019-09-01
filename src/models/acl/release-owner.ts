@@ -14,7 +14,9 @@ export interface IReleaseOwnerAcl extends IAclBase {
 export default class ReleaseOwnerAcl extends AclBase
   implements IReleaseOwnerAcl {
   release_owners: string[];
+
   readonly kind = 'release_owner' as const;
+
   constructor(arg: IReleaseOwnerAcl) {
     super(arg);
     this.release_owners = arg.release_owners;

@@ -1,13 +1,12 @@
 import * as yml from 'js-yaml';
 import { GitHubAPI } from 'probot/lib/github';
+import { PullsListReviewsResponseItem } from '@octokit/rest';
 import { getRepoTextFiles } from './files';
 import { Acl, IFile, ICommitWithFileChanges } from '../../types';
-import { PullsListReviewsResponseItem } from '@octokit/rest';
 import OwnerAcl, { IOwnerAcl } from '../../models/acl/owner';
 import ReleaseOwnerAcl, {
   IReleaseOwnerAcl,
 } from '../../models/acl/release-owner';
-import AclBase from '../../models/acl/base';
 
 /**
  * Parse a corretly formatted string into an {@link ACL} data structure
@@ -46,7 +45,8 @@ function parseAcl(fileContents: string): Acl {
       block_message,
       description,
     });
-  } else if (release_owners) {
+  }
+  if (release_owners) {
     // release owner ACL
     return new ReleaseOwnerAcl({
       release_owners,
@@ -57,7 +57,8 @@ function parseAcl(fileContents: string): Acl {
       block_message,
       description,
     });
-  } else throw new Error(`Invalid ACL file: \n${JSON.stringify(aclData)}`);
+  }
+  throw new Error(`Invalid ACL file: \n${JSON.stringify(aclData)}`);
 }
 
 /**
@@ -112,21 +113,21 @@ function getOwnerAclsForFiles(
   ];
 }
 
-function isOwnerAcl(acl: AclBase & Partial<OwnerAcl>): acl is OwnerAcl {
-  return typeof acl.owners !== 'undefined';
-}
+// function isOwnerAcl(acl: AclBase & Partial<OwnerAcl>): acl is OwnerAcl {
+//   return typeof acl.owners !== 'undefined';
+// }
 
-function isOwnerAclFile(
-  file: IFile<AclBase & Partial<OwnerAcl>>,
-): file is IFile<AclBase & Partial<OwnerAcl>> {
-  return typeof file.content.owners !== 'undefined';
-}
+// function isOwnerAclFile(
+//   file: IFile<AclBase & Partial<OwnerAcl>>,
+// ): file is IFile<AclBase & Partial<OwnerAcl>> {
+//   return typeof file.content.owners !== 'undefined';
+// }
 
 export async function getAclShipitStatusForCommits(
   repoAclFiles: IFile<Acl>[],
   commits: ICommitWithFileChanges[],
   existingReviews: PullsListReviewsResponseItem[],
-) {
+): Promise<never[]> {
   const commitAcls = commits.map(c => {
     const commitFiles = c.files.map(f => f.filename);
     const acls = getOwnerAclsForFiles(repoAclFiles, commitFiles);
@@ -141,9 +142,11 @@ export async function getAclShipitStatusForCommits(
     user,
     commit_id,
   }));
+  // eslint-disable-next-line no-console
   console.log('Existing Reviews:\n', JSON.stringify(reviewData, null, '  '));
 
   commitAcls.forEach(cacl => {
+    // eslint-disable-next-line no-console
     console.log(
       `Commit: ${cacl.commit.sha}\n${JSON.stringify(
         cacl.acls.map(({ name, content: { owners } }) => ({ name, owners })),

@@ -1,5 +1,5 @@
 import { GitHubAPI } from 'probot/lib/github';
-import { gql } from '../../utils/gql';
+import { gql } from '../gql';
 import { IFile } from '../../types';
 
 /**

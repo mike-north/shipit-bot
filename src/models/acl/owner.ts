@@ -13,7 +13,9 @@ export interface IOwnerAcl extends IAclBase {
 
 export default class OwnerAcl extends AclBase implements IOwnerAcl {
   owners: string[];
+
   readonly kind = 'owner' as const;
+
   constructor(arg: IOwnerAcl) {
     super(arg);
     this.owners = arg.owners;

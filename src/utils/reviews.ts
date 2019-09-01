@@ -9,12 +9,19 @@ import { PullsListReviewsResponseItem } from '@octokit/rest';
  * @param repo name of repo
  * @param pull_number pull request number
  */
-export async function getReviewsForPullRequest(
-  github: { pulls: Pick<GitHubAPI['pulls'], 'listReviews'> },
-  owner: string,
-  repo: string,
-  pull_number: number,
-): Promise<PullsListReviewsResponseItem[]> {
+export async function getReviewsForPullRequest({
+  github,
+  owner,
+  repo,
+  pull_number,
+}: {
+  github: {
+    pulls: Pick<GitHubAPI['pulls'], 'listReviews'>;
+  };
+  owner: string;
+  repo: string;
+  pull_number: number;
+}): Promise<PullsListReviewsResponseItem[]> {
   const { data: reviewsList } = await github.pulls.listReviews({
     owner,
     repo,

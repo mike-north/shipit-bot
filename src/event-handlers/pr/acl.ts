@@ -1,5 +1,5 @@
+import * as Webhooks from '@octokit/webhooks';
 import { Context } from 'probot';
-import Webhooks = require('@octokit/webhooks');
 import {
   getAclsForRepo,
   getAclShipitStatusForCommits,
@@ -10,7 +10,7 @@ import { getReviewsForPullRequest } from '../../utils/reviews';
 
 export async function updateAclStatus(
   context: Context<Webhooks.WebhookPayloadPullRequest>,
-) {
+): Promise<void> {
   const {
     github,
     payload: { pull_request },
@@ -40,13 +40,13 @@ export async function updateAclStatus(
     repo,
     await pCommits,
   );
-  console.log('getting ship-it statuese');
+  context.log('getting ship-it statuese');
   const shipitStatus = await getAclShipitStatusForCommits(
     await pAcls,
     await pCommitData,
     await pReviews,
   );
-  console.log(JSON.stringify(shipitStatus, null, '  '));
+  context.log(JSON.stringify(shipitStatus, null, '  '));
 }
 
 // async function forceOverrides(
