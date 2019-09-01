@@ -11,8 +11,8 @@ const issueCreatedBody = { body: 'Thanks for opening this issue!' };
 
 nock.disableNetConnect();
 
-QUnit.module('My Probot app', async hooks => {
-  let probot: any;
+QUnit.module('My Probot app', hooks => {
+  let probot: Probot;
 
   hooks.beforeEach(() => {
     probot = new Probot({ id: 123, cert: 'test' });
@@ -24,24 +24,22 @@ QUnit.module('My Probot app', async hooks => {
   });
 
   QUnit.test('creates a comment when an issue is opened', async assert => {
-    const done = assert.async();
-    // Test that we correctly return a test token
-    nock('https://api.github.com')
-      .post('/app/installations/2/access_tokens')
-      .reply(200, { token: 'test' });
-
     // Test that a comment is posted
     nock('https://api.github.com')
       .post('/repos/hiimbex/testing-things/issues/1/comments', (body: any) => {
         assert.deepEqual(body, issueCreatedBody, 'Payload body is as expected');
-        done();
+        assert.step('attempted to create issue comment');
         return true;
       })
       .reply(200);
 
     // Receive a webhook event
+    await probot.receive({ id: '2', name: 'issues', payload });
 
-    await probot.receive({ name: 'issues', payload });
+    assert.verifySteps(
+      ['attempted to create issue comment'],
+      'order of operations is as expected',
+    );
   });
 });
 

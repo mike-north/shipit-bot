@@ -1,2 +1,2 @@
 export { IDict } from './collections';
-export { FArguments } from './utilities';
+export { FArguments, Pick2, Pick3 } from './utilities';

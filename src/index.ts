@@ -1,5 +1,4 @@
 import { Probot } from 'probot';
-import { join } from 'path';
+import appFn from './server';
 
-process.stdout.write('starting...');
-Probot.run(['', '', join(__dirname, 'index.js')]);
+Probot.run(appFn);
