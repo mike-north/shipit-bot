@@ -1,5 +1,6 @@
 node_modules
-.env
+.env*
+!.env.example
 yarn-error.log
 lib
 .vscode/settings.json
