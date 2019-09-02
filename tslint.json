@@ -1,11 +1,11 @@
 {
-  "extends": "dtslint/dtslint.json",
   "rules": {
     "semicolon": false,
     "invalid-void": false,
     "indent": false,
     "interface-name": false,
     "array-type": false,
-    "unified-signatures": true
+    "unified-signatures": true,
+    "only-arrow-functions": false
   }
 }
