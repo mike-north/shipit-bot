@@ -1,5 +1,5 @@
-import { GitHubAPI } from 'probot/lib/github';
-import { PullsListReviewsResponseItem } from '@octokit/rest';
+import * as Octokit from '@octokit/rest';
+import { Pick2 } from '../../types/utilities';
 
 /**
  * Get the reviews completed for a given pull request
@@ -10,13 +10,11 @@ import { PullsListReviewsResponseItem } from '@octokit/rest';
  * @param pull_number pull request number
  */
 export async function getReviewsForPullRequest(
-  github: {
-    pulls: Pick<GitHubAPI['pulls'], 'listReviews'>;
-  },
+  github: Pick2<Octokit, 'pulls', 'listReviews'>,
   owner: string,
   repo: string,
   pull_number: number,
-): Promise<PullsListReviewsResponseItem[]> {
+): Promise<Octokit.PullsListReviewsResponseItem[]> {
   const { data: reviewsList } = await github.pulls.listReviews({
     owner,
     repo,
