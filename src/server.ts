@@ -1,6 +1,6 @@
-import { Application } from 'probot'; // eslint-disable-line no-unused-vars
+import { Application, ApplicationFunction } from 'probot'; // eslint-disable-line no-unused-vars
 
-export = (app: Application): void => {
+const entry: ApplicationFunction = (app: Application): void => {
   app.on('issues.opened', async context => {
     const issueComment = context.issue({
       body: 'Thanks for opening this issue!',
@@ -13,3 +13,5 @@ export = (app: Application): void => {
   // To get your app running against GitHub, see:
   // https://probot.github.io/docs/development/
 };
+
+export = entry;

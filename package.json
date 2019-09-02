@@ -27,6 +27,7 @@
     "@octokit/webhooks": "^6.2.2",
     "debug": "^4.1.1",
     "js-yaml": "^3.13.1",
+    "jsonschema": "^1.2.4",
     "pm2": "^3.5.1",
     "probot": "^9.3.2"
   },
@@ -40,6 +41,7 @@
     "@types/ioredis": "^4.0.15",
     "@types/jest": "^24.0.0",
     "@types/js-yaml": "^3.12.1",
+    "@types/jsonschema": "^1.1.1",
     "@types/lru-cache": "^5.1.0",
     "@types/nock": "^9.3.0",
     "@types/node": "^11.9.0",
