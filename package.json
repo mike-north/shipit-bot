@@ -32,6 +32,7 @@
     "probot": "^9.3.2"
   },
   "devDependencies": {
+    "@octokit/graphql": "^4.0.0",
     "@octokit/graphql-schema": "^6.31.1",
     "@playlyfe/gql": "^2.6.2",
     "@types/bunyan": "^1.8.6",

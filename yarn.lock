@@ -50,6 +50,14 @@
     "@octokit/request" "^5.0.0"
     universal-user-agent "^3.0.0"
 
+"@octokit/graphql@^4.0.0":
+  version "4.0.0"
+  resolved "https://registry.yarnpkg.com/@octokit/graphql/-/graphql-4.0.0.tgz#a1b872b43461f86a9be123cc9ede208b18f3b974"
+  integrity sha512-ewOTBEmdSorKeo95b+jFkoDMmQ47w1ivJm1wYlYHd5zfqjRnEpz66OqvpZavA+3uG+QHnOnRKfkA2kBZG2oY1w==
+  dependencies:
+    "@octokit/request" "^5.0.0"
+    universal-user-agent "^3.0.0"
+
 "@octokit/plugin-enterprise-compatibility@^1.0.0":
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/@octokit/plugin-enterprise-compatibility/-/plugin-enterprise-compatibility-1.1.1.tgz#1d4189d588eccb1bbc23cd72278129491cfba5d2"
