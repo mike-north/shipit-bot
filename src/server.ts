@@ -1,17 +1,22 @@
 import { Application, ApplicationFunction } from 'probot'; // eslint-disable-line no-unused-vars
+import { updateAclStatus } from './event-handlers/pr/acl';
+import { debounce } from './utils/debounce';
+
+const STANDARD_DEBOUNCE = 1000; // ms
+
+process.stdout.write('STARTING UP SHIPIT BOT\n\n\n');
 
 const entry: ApplicationFunction = (app: Application): void => {
-  app.on('issues.opened', async context => {
-    const issueComment = context.issue({
-      body: 'Thanks for opening this issue!',
-    });
-    await context.github.issues.createComment(issueComment);
+  app.log.info('Setting up');
+  app.on(`*`, async context => {
+    context.log.error('EVENT: ', context.event);
+    context.log({ event: context.event, action: context.payload.action });
   });
-  // For more information on building apps:
-  // https://probot.github.io/docs/
 
-  // To get your app running against GitHub, see:
-  // https://probot.github.io/docs/development/
+  app.on(
+    ['pull_request', 'pull_request.edited'],
+    debounce(updateAclStatus, STANDARD_DEBOUNCE),
+  );
 };
 
-export = entry;
+module.exports = entry;
