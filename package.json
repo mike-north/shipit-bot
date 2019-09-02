@@ -15,7 +15,7 @@
     "lint": "eslint src test --ext js,ts",
     "start": "pm2 start ./lib/index.js -i max",
     "pretest": "tsc -b test",
-    "test": "qunit test-js/test/**/*.test.js",
+    "test": "qunit 'test-js/test/**/*.test.js'",
     "test:ci": "yarn test && yarn test:types",
     "test:types": "dtslint type-tests",
     "watch": "concurrently \"npm:watch:build\" \"npm:watch:dev\" \"yarn pm2 log\" -n \"TS,PM,Log\" -c \"bgYellow.black,bgGreen.black,bgWhite.black\"",
