@@ -9,11 +9,14 @@ import payload from './fixtures/issues.opened.json';
 
 const issueCreatedBody = { body: 'Thanks for opening this issue!' };
 
-nock.disableNetConnect();
-
 QUnit.module('My Probot app', hooks => {
   let probot: Probot;
-
+  hooks.before(() => {
+    nock.disableNetConnect();
+  });
+  hooks.after(() => {
+    nock.enableNetConnect();
+  });
   hooks.beforeEach(() => {
     probot = new Probot({ id: 123, cert: 'test' });
     // Load our app into probot
