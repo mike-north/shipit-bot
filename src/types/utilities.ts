@@ -21,12 +21,12 @@ export type FArguments<F> = F extends (...args: infer ARGS) => any
  * }
  *
  * const pickTwoFoo: Pick2<Foo, 'b', 'c'> = new Foo();
- * pickTwoFoo.b.c; // ☑️ will type-check
- * pickTwoFoo.bar; // ❌ will NOT type-check
+ * pickTwoFoo.b.c; // DOES type-check
+ * pickTwoFoo.bar; // DOES NOT type-check
  *
  * const otherPickTwoFoo: Pick2<Foo, 'b', 'c'> = new Foo();
- * otherPickTwoFoo.b; // ❌ will NOT type-check
- * otherPickTwoFoo.bar.baz; // ☑️ will type-check
+ * otherPickTwoFoo.b; // DOES NOT type-check
+ * otherPickTwoFoo.bar.baz; // DOES type-check
  */
 export type Pick2<
   OBJ,
@@ -54,8 +54,8 @@ export type Pick2<
  * }
  *
  * const pickThreeFoo: Pick3<Foo, 'b', 'c', 'd'> = new Foo();
- * pickThreeFoo.b.c.d; // ☑️ will type-check
- * pickThreeFoo.bar; // ❌ will NOT type-check
+ * pickThreeFoo.b.c.d; // DOES type-check
+ * pickThreeFoo.bar; // DOES NOT type-check
  * @see Pick2
  */
 export type Pick3<
