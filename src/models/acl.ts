@@ -7,6 +7,13 @@ import AclBase, { IAclBase } from './acl/base';
 
 const validator = new JSONValidator();
 
+/**
+ * A type containing all possible properties on an ACL
+ *
+ * @note This is deliberately not exported, and should not be used outside of parsing logic
+ */
+type PartialAcl = IAclBase & ({ owners?: string[]; release_owners?: string[] });
+
 const ACL_DATA_SCHEMA = {
   id: '/AclFile',
   type: 'object',
@@ -30,23 +37,26 @@ const ACL_DATA_SCHEMA = {
   required: ['paths'],
 };
 
-function parseYaml(
-  yamlText: string,
-): IAclBase & ({ owners?: string[]; release_owners?: string[] }) {
-  const aclData = yml.safeLoad(yamlText);
-  const result = validator.validate(aclData, ACL_DATA_SCHEMA);
-  if (result.valid)
-    return aclData as IAclBase &
-      ({ owners?: string[]; release_owners?: string[] });
-  if (!result.errors.length)
+function isPartialAcl(val: any): val is PartialAcl {
+  const validationResult = validator.validate(val, ACL_DATA_SCHEMA);
+  if (validationResult.valid) return true;
+  if (!validationResult.errors.length)
     throw new Error(
-      'ACL data was found to be invalid, but no specific errors were detected',
+      'ACL was found to be invalid, but no specific errors were detected',
     );
   throw new Error(
-    `ACL data parse error: ${result.errors
+    `ACL parse error: ${validationResult.errors
       .map(e => `${e.name}: on ${e.property} - ${e.message}`)
       .join('\n')}`,
   );
+}
+
+function parseYaml(yamlText: string): PartialAcl {
+  const aclData = yml.safeLoad(yamlText);
+  if (isPartialAcl(aclData)) return aclData;
+  // theoretically unreachable, b/c `isPartialAcl`
+  // user-defined type guard above either returns true or throws
+  throw new Error(`Invaid ACL data: ${JSON.stringify(aclData, null, '  ')}`);
 }
 
 /**
