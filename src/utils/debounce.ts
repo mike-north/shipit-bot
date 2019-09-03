@@ -15,8 +15,8 @@ export function debounce<F extends (...args: any[]) => void>(
   fn: F,
   timeout: number,
   state: WeakMap<Function, ReturnType<typeof setTimeout>> = defaultDebounceMap,
-): (...args: FArguments<F>) => Promise<void> {
-  return async function debounced(...args: FArguments<F>): Promise<void> {
+): (...args: FArguments<F>) => void {
+  return function debounced(...args: FArguments<F>): void {
     // check to see if we should continue waiting
     const existingTimeout = state.get(fn);
 
