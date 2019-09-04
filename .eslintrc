@@ -45,7 +45,8 @@
         "QUnit": true
       },
       "rules": {
-        "func-names": 0
+        "func-names": 0,
+        "@typescript-eslint/explicit-function-return-type": 0
       },
       "settings": {
         "import/resolver": {
