@@ -1,5 +1,6 @@
 import { GitHubAPI } from 'probot/lib/github';
 import { PullsListReviewsResponseItem } from '@octokit/rest';
+import { Dict } from '@mike-north/types';
 import { getRepoTextFiles } from './files';
 import { Acl, IFile, ICommitWithFileChanges } from '../../types';
 import OwnerAcl from '../../models/acl/owner';
@@ -57,11 +58,33 @@ function getOwnerAclsForFiles(
   ];
 }
 
+export type AclApprovalState =
+  | { name: string; reviewStatus: 'PENDING' }
+  | {
+      name: string;
+      reviewer: string;
+      reviewPosition: number;
+      reviewCommit: string;
+      reviewUrl: string;
+      isStale: boolean;
+      reviewStatus:
+        | 'COMMENTED'
+        | 'DISMISSED'
+        | 'APPROVED'
+        | 'CHANGES_REQUESTED';
+    };
+
 export async function getAclShipitStatusForCommits(
-  repoAclFiles: IFile<Acl>[],
+  repoAclFiles: IFile<OwnerAcl>[],
   commits: ICommitWithFileChanges[],
   existingReviews: PullsListReviewsResponseItem[],
-): Promise<never[]> {
+): Promise<
+  {
+    commit: ICommitWithFileChanges;
+    commitPosition: number;
+    acls: AclApprovalState[];
+  }[]
+> {
   const commitAcls = commits.map(c => {
     const commitFiles = c.files.map(f => f.filename);
     const acls = getOwnerAclsForFiles(repoAclFiles, commitFiles);
@@ -71,23 +94,75 @@ export async function getAclShipitStatusForCommits(
     };
   });
 
-  const reviewData = existingReviews.map(({ state, user, commit_id }) => ({
-    state,
-    user,
-    commit_id,
-  }));
-  // eslint-disable-next-line no-console
-  console.log('Existing Reviews:\n', JSON.stringify(reviewData, null, '  '));
+  const commitList = commits.map(c => c.sha);
 
-  commitAcls.forEach(cacl => {
-    // eslint-disable-next-line no-console
-    console.log(
-      `Commit: ${cacl.commit.sha}\n${JSON.stringify(
-        cacl.acls.map(({ name, content: { owners } }) => ({ name, owners })),
-        null,
-        '  ',
-      )}`,
-    );
+  const reviewPositions = existingReviews.reduce(
+    (map, r) => {
+      // eslint-disable-next-line no-param-reassign
+      map[r.user.login] = [commitList.indexOf(r.commit_id), r];
+      return map;
+    },
+    {} as Dict<[number, PullsListReviewsResponseItem]>,
+  );
+
+  const reviewCommitPositionMap: Dict<
+    [number, PullsListReviewsResponseItem]
+  > = {};
+
+  repoAclFiles.forEach(aclFile => {
+    const {
+      content: { owners },
+    } = aclFile;
+    const latestReview = owners
+      .filter(o => Object.hasOwnProperty.call(reviewPositions, o))
+      .reduce(
+        (latest, thisOwner) => {
+          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+          const ownerReview = reviewPositions[thisOwner]!;
+          if (latest === null) return ownerReview;
+          return ownerReview[0] > latest[0] ? ownerReview : latest;
+        },
+        null as [number, PullsListReviewsResponseItem] | null,
+      );
+    if (latestReview) reviewCommitPositionMap[aclFile.name] = latestReview;
   });
-  return [];
+
+  return commitAcls.map(({ commit, acls }) => {
+    const commitPosition = commitList.indexOf(commit.sha);
+
+    const result: {
+      commit: ICommitWithFileChanges;
+      commitPosition: number;
+      acls: AclApprovalState[];
+    } = {
+      commit,
+      acls: acls.map(acl => {
+        const aclReview = reviewCommitPositionMap[acl.name];
+        if (!aclReview) return { ...acl, reviewStatus: 'PENDING' as const };
+        const [reviewPosition, review] = aclReview;
+        const reviewer = review.user.login;
+        const reviewCommit = review.commit_id;
+        const reviewUrl = review.html_url;
+
+        return {
+          ...acl,
+          reviewStatus: review.state as Exclude<
+            AclApprovalState['reviewStatus'],
+            'PENDING'
+          >,
+          isStale: commitPosition > reviewPosition,
+          reviewer,
+          reviewPosition,
+          reviewCommit,
+          reviewUrl,
+        };
+      }),
+      commitPosition,
+    };
+    return result;
+  });
+}
+
+export function isOwnerAclFile(acl: IFile<Acl>): acl is IFile<OwnerAcl> {
+  return (acl.content as any).owners;
 }
