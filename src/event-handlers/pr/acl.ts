@@ -136,7 +136,7 @@ export async function updateAclStatus(
     }
 
     return context.repo({
-      name: `ACL / ${aclName}`,
+      name: `ACL: ${aclResult.content.description || aclName}`,
       head_sha: pull_request.head.sha,
       status: inProgress ? 'in_progress' : 'completed',
       conclusion,

@@ -58,21 +58,21 @@ function getOwnerAclsForFiles(
   ];
 }
 
-export type AclApprovalState =
-  | { name: string; reviewStatus: 'PENDING' }
-  | {
-      name: string;
-      reviewer: string;
-      reviewPosition: number;
-      reviewCommit: string;
-      reviewUrl: string;
-      isStale: boolean;
-      reviewStatus:
-        | 'COMMENTED'
-        | 'DISMISSED'
-        | 'APPROVED'
-        | 'CHANGES_REQUESTED';
-    };
+export type AclApprovalState = IFile<OwnerAcl> &
+  (
+    | { reviewStatus: 'PENDING' }
+    | {
+        reviewer: string;
+        reviewPosition: number;
+        reviewCommit: string;
+        reviewUrl: string;
+        isStale: boolean;
+        reviewStatus:
+          | 'COMMENTED'
+          | 'DISMISSED'
+          | 'APPROVED'
+          | 'CHANGES_REQUESTED';
+      });
 
 export async function getAclShipitStatusForCommits(
   repoAclFiles: IFile<OwnerAcl>[],
@@ -119,8 +119,20 @@ export async function getAclShipitStatusForCommits(
         (latest, thisOwner) => {
           // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
           const ownerReview = reviewPositions[thisOwner]!;
+          // if there's only one review, this is probably the most important information to surface
           if (latest === null) return ownerReview;
-          return ownerReview[0] > latest[0] ? ownerReview : latest;
+          // if we're currently regarding a "commented" review as the strongest signal, seek a stronger one
+          if (latest[1].state === 'COMMENTED') {
+            if (
+              ownerReview[1].state !== 'COMMENTED' || // a more concrete one
+              ownerReview[0] > latest[0] // a more recent one
+            )
+              return ownerReview;
+          } else {
+            if (ownerReview[1].state === 'COMMENTED') return latest;
+            return ownerReview[0] > latest[0] ? ownerReview : latest;
+          }
+          return latest;
         },
         null as [number, PullsListReviewsResponseItem] | null,
       );
