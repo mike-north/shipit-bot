@@ -40,7 +40,6 @@ export async function updateAclStatus(
     repo,
     await pCommits,
   );
-  context.log('getting ship-it statuese');
   const shipitStatus = await getAclShipitStatusForCommits(
     await pAcls,
     await pCommitData,

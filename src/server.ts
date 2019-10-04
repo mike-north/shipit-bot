@@ -19,4 +19,4 @@ const entry: ApplicationFunction = (app: Application): void => {
   );
 };
 
-module.exports = entry;
+export = entry;
