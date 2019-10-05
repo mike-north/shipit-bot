@@ -12,25 +12,58 @@ import { getCommitHistoryForPullRequest } from '../../utils/repo/pull-request';
 import { getFileChangesForCommits } from '../../utils/repo/commits';
 import { getReviewsForPullRequest } from '../../utils/repo/reviews';
 import UnreachableError from '../../utils/errors/unreachable';
+import { getCommentsForIssue } from '../../utils/repo/issues';
+
+function aclWithCount(n: number): string {
+  switch (n) {
+    case 0:
+      return 'No ACLs';
+    case 1:
+      return '1 ACL';
+    default:
+      return `${n} ACLs`;
+  }
+}
 
 export async function updateAclStatus(
-  context: Context<Webhooks.WebhookPayloadPullRequest>,
+  context: Context<
+    Webhooks.WebhookPayloadPullRequest | Webhooks.WebhookPayloadIssueComment
+  >,
 ): Promise<void> {
-  const {
-    github,
-    payload: { pull_request },
-  } = context;
+  const { github, payload } = context;
   const repoData = context.repo();
   const { owner, repo } = repoData;
 
-  github.checks.create(
+  const pull_request = (payload as any).pull_request
+    ? (payload as Webhooks.WebhookPayloadPullRequest).pull_request
+    : (await github.pulls.get(
+        context.repo({
+          pull_number: (payload as Webhooks.WebhookPayloadIssueComment).issue
+            .number,
+        }),
+      )).data;
+
+  // maybe not necessary to do this _all the time_
+  const pAclOverrideFound = getCommentsForIssue(
+    context,
+    pull_request.number,
+  ).then(
+    comments =>
+      comments.filter(c => c.body.indexOf('ACLOVERRIDE') >= 0).length > 0,
+  );
+
+  const pMainCheck = github.checks.create(
     context.repo({
       name: 'ACL',
       head_sha: pull_request.head.sha,
       status: 'in_progress',
+      output: {
+        title: 'Evaluating ACL approval status',
+        summary: '',
+      },
     }),
   );
-
+  context.log.info(`Getting ACLs for Repo: ${repo}`);
   // Get the ACLs pertaining to this repo
   const pAcls = getAclsForRepo(github, owner, repo);
   const pReviews = getReviewsForPullRequest(
@@ -54,29 +87,43 @@ export async function updateAclStatus(
     repo,
     await pCommits,
   );
+  const repoAcls = (await pAcls).filter(isOwnerAclFile);
+  context.log.info(`${repo} ACLs: ${repoAcls.map(a => a.name).join(', ')}`);
   const commitsWithShipitStatus = await getAclShipitStatusForCommits(
-    (await pAcls).filter(isOwnerAclFile),
+    repoAcls,
     await pCommitData,
     await pReviews,
   );
+  context.log.debug(
+    `COMMITS WITH SHIPITS\n${commitsWithShipitStatus
+      .map(
+        c =>
+          `\t${c.commit.sha}: ${c.acls.map(
+            a => `${a.name}: ${a.reviewStatus}`,
+          )}`,
+      )
+      .join('\n')}`,
+  );
 
   const res = commitsWithShipitStatus.reduceRight(
-    (acls, thisCommitWithStatus) => {
+    (aclDict, thisCommitWithStatus) => {
+      context.log.debug(`Examining commit\t${thisCommitWithStatus.commit.sha}`);
       thisCommitWithStatus.acls.forEach(acl => {
-        if (acl.reviewStatus === 'PENDING' || acl.name in acls) return;
-        Object.assign(acls, { [acl.name]: acl });
+        context.log.debug(`\tACL: ${acl.name}: ${acl.reviewStatus}`);
+        if (acl.name in aclDict) return;
+        Object.assign(aclDict, { [acl.name]: acl });
       });
-      return acls;
+      return aclDict;
     },
     {} as Dict<AclApprovalState>,
   );
-
-  const aclOverrideFound = false;
-
+  context.log.debug('RES', { res });
+  const aclOverrideFound = await pAclOverrideFound;
+  context.log.debug(`ACL OVERRIDE FOUND? ${aclOverrideFound}`);
   const aclChecks: ChecksCreateParams[] = Object.keys(res).map(aclName => {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const aclResult = res[aclName]!;
-    const inProgress = aclResult.reviewStatus === 'PENDING';
+    let inProgress = aclResult.reviewStatus === 'PENDING';
     let output: ChecksCreateParams['output'];
     let conclusion: ChecksCreateParams['conclusion'];
     let url: string | undefined;
@@ -107,7 +154,7 @@ export async function updateAclStatus(
       case 'CHANGES_REQUESTED':
         output = {
           summary: '',
-          title: `Changes requested by @${aclResult.reviewer}`,
+          title: `Changes requested by @${aclResult.reviewer} at ${shortCommit}`,
         };
         conclusion = 'failure';
         url = aclResult.reviewUrl;
@@ -123,7 +170,7 @@ export async function updateAclStatus(
       case 'COMMENTED':
         output = {
           summary: '',
-          title: `Non-approving review by @${aclResult.reviewer}`,
+          title: `Non-approving review by @${aclResult.reviewer} at ${shortCommit}`,
         };
         conclusion = 'failure';
         url = aclResult.reviewUrl;
@@ -133,6 +180,19 @@ export async function updateAclStatus(
           aclResult,
           `Unknown reivew status type: ${(aclResult as any).reviewStatus}`,
         );
+    }
+    if (aclOverrideFound) {
+      if (
+        inProgress ||
+        (conclusion &&
+          ['failure', 'cancelled', 'action_required'].includes(conclusion))
+      ) {
+        inProgress = false;
+        output.title = `ACLOVERRIDE (was: ${conclusion || 'pending'} - ${
+          output.title
+        })`;
+        conclusion = 'neutral';
+      }
     }
 
     return context.repo({
@@ -144,47 +204,88 @@ export async function updateAclStatus(
       output,
     });
   });
+  context.log.debug(`ACL Checks`, { aclChecks });
 
   await Promise.all(aclChecks.map(chk => github.checks.create(chk)));
 
-  const aclBins = aclChecks.reduce(
-    (bins, aclCheck) => {
-      bins.allNames.push(aclCheck.name);
-      if (aclCheck.conclusion) {
-        if (bins.concluded[aclCheck.conclusion])
-          bins.concluded[aclCheck.conclusion].push(aclCheck.name);
+  context.log.debug('Created individual check runs for ACLs');
+
+  const aclBins = Object.keys(res).reduce(
+    (bins, aclName) => {
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      const aclResult = res[aclName]!;
+      const existingStatusList = bins[aclResult.reviewStatus];
+      if (existingStatusList) {
+        existingStatusList.push(aclResult);
+      } else {
         // eslint-disable-next-line no-param-reassign
-        bins.concluded[aclCheck.conclusion] = [aclCheck.name];
-      } else bins.nonConcluded.push(aclCheck.name);
+        bins[aclResult.reviewStatus] = [aclResult];
+      }
       return bins;
     },
-    {
-      allNames: [] as string[],
-      nonConcluded: [] as string[],
-      concluded: {} as {
-        [K in Exclude<ChecksCreateParams['conclusion'], undefined>]: string[];
-      },
-    },
+    {} as Record<
+      AclApprovalState['reviewStatus'],
+      AclApprovalState[] | undefined
+    >,
   );
-  github.checks.create(
+  context.log.debug('Sorted ACL check outcomes into bins', { aclBins });
+
+  const aclsPassed = (aclBins.APPROVED || []).length;
+  const aclsFailed = (aclBins.CHANGES_REQUESTED || []).length;
+  const aclsDismissed = (aclBins.DISMISSED || []).length;
+  const aclsCommented = (aclBins.COMMENTED || []).length;
+
+  const aclsPending = (aclBins.PENDING || []).length;
+
+  context.log.debug('ACL statuses: ', {
+    passed: aclsPassed,
+    failed: aclsFailed,
+    pending: aclsPending,
+    commented: aclsCommented,
+    dismissed: aclsDismissed,
+  });
+
+  const mainCheck = (await pMainCheck).data;
+  let mainCheckConclusion: ChecksCreateParams['conclusion'];
+  let mainCheckDescription = '';
+  if (aclsFailed || aclsPending || aclsCommented || aclsDismissed) {
+    mainCheckConclusion = 'failure';
+    const descriptionParts: string[] = [];
+    if (aclsFailed) {
+      descriptionParts.push(`${aclWithCount(aclsFailed)} requested changes`);
+    }
+    if (aclsPending + aclsCommented) {
+      descriptionParts.push(
+        `${aclWithCount(aclsPending + aclsCommented)} still need${
+          aclsPending === 1 ? 's' : ''
+        } approval`,
+      );
+    }
+    if (aclsDismissed) {
+      descriptionParts.push(
+        `${aclWithCount(aclsDismissed)} ${
+          aclsPending === 1 ? 'has' : 'have'
+        } dismissed reviews`,
+      );
+    }
+    mainCheckDescription = descriptionParts.join(', ');
+  } else {
+    mainCheckConclusion = 'success';
+    mainCheckDescription = `${aclWithCount(aclsPassed)} approved!`;
+  }
+  if (aclOverrideFound && mainCheckConclusion !== 'success') {
+    mainCheckConclusion = 'neutral';
+    mainCheckDescription = `ACLOVERRIDE (was: ${mainCheckDescription})`;
+  }
+  await github.checks.update(
     context.repo({
-      name: 'ACL',
-      head_sha: pull_request.head.sha,
+      check_run_id: mainCheck.id,
       status: 'completed',
-      conclusion: aclChecks.reduce(
-        (bottomLine, aclCheck) => {
-          if (bottomLine === 'failure' || aclCheck.conclusion !== 'success')
-            return 'failure';
-          return 'success';
-        },
-        'success' as 'success' | 'failure',
-      ),
+      conclusion: mainCheckConclusion,
       output: {
-        title: `${aclBins.concluded.success.length}/${aclBins.allNames.length} ACLs with approvals`,
+        title: mainCheckDescription,
         summary: '',
       },
     }),
   );
-
-  context.log(JSON.stringify(commitsWithShipitStatus, null, '  '));
 }

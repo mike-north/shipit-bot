@@ -8,9 +8,9 @@ process.stdout.write('STARTING UP SHIPIT BOT\n\n\n');
 
 const entry: ApplicationFunction = (app: Application): void => {
   app.log.info('Setting up');
-  app.on(`*`, async context => {
-    context.log({ event: context.event, action: context.payload.action });
-  });
+  // app.on(`*`, async context => {
+  //   context.log({ event: context.event, action: context.payload.action });
+  // });
 
   app.on(
     [
