@@ -19,3 +19,21 @@ export async function getCommentsForIssue(
   );
   return comments.data;
 }
+
+/**
+ * Given a pull request number, determine whether an ACLOVERRIDE comment exists
+ *
+ * @param context Probot context
+ * @param prNumber pull request number
+ */
+export function isAclOverrideFound(
+  context: Context<
+    Webhooks.WebhookPayloadPullRequest | Webhooks.WebhookPayloadIssueComment
+  >,
+  prNumber: number,
+): Promise<boolean> {
+  return getCommentsForIssue(context, prNumber).then(
+    comments =>
+      comments.filter(c => c.body.indexOf('ACLOVERRIDE') >= 0).length > 0,
+  );
+}

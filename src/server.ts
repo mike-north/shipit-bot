@@ -4,7 +4,7 @@ import { debounce } from './utils/debounce';
 
 const STANDARD_DEBOUNCE = 1000; // ms
 
-process.stdout.write('STARTING UP SHIPIT BOT\n\n\n');
+process.stdout.write('STARTING UP SHIPIT BOT\n');
 
 const entry: ApplicationFunction = (app: Application): void => {
   app.log.info('Setting up');

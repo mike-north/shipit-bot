@@ -1,6 +1,8 @@
 import { GitHubAPI } from 'probot/lib/github';
 import { Pick2 } from '../../types';
 
+import Webhooks = require('@octokit/webhooks');
+
 /**
  * Get the list of commit SHAs that relate to a specified pull request
  *

@@ -8,3 +8,9 @@ import ReleaseOwnerAcl, { IReleaseOwnerAcl } from '../models/acl/release-owner';
  */
 export type IAcl = IOwnerAcl | IReleaseOwnerAcl;
 export type Acl = OwnerAcl | ReleaseOwnerAcl;
+
+export type AclApprovalReviewStatus =
+  | 'COMMENTED'
+  | 'DISMISSED'
+  | 'APPROVED'
+  | 'CHANGES_REQUESTED';

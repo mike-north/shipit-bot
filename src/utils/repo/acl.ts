@@ -1,10 +1,15 @@
 import { GitHubAPI } from 'probot/lib/github';
-import { PullsListReviewsResponseItem } from '@octokit/rest';
+import {
+  PullsListReviewsResponseItem,
+  ChecksCreateParams,
+} from '@octokit/rest';
 import { Dict } from '@mike-north/types';
 import { getRepoTextFiles } from './files';
 import { Acl, IFile, ICommitWithFileChanges } from '../../types';
 import OwnerAcl from '../../models/acl/owner';
 import { createAcl } from '../../models/acl';
+import UnreachableError from '../errors/unreachable';
+import { AclApprovalReviewStatus } from '../../types/acls';
 
 /**
  * Get the list of ACLs included in a specified repo
@@ -58,21 +63,21 @@ function getOwnerAclsForFiles(
   ];
 }
 
-export type AclApprovalState = IFile<OwnerAcl> &
-  (
-    | { reviewStatus: 'PENDING' }
-    | {
-        reviewer: string;
-        reviewPosition: number;
-        reviewCommit: string;
-        reviewUrl: string;
-        isStale: boolean;
-        reviewStatus:
-          | 'COMMENTED'
-          | 'DISMISSED'
-          | 'APPROVED'
-          | 'CHANGES_REQUESTED';
-      });
+export type AclPendingApprovalState = IFile<OwnerAcl> & {
+  reviewStatus: 'PENDING';
+};
+export type AclConcludedApprovalState = IFile<OwnerAcl> & {
+  reviewer: string;
+  reviewPosition: number;
+  reviewCommit: string;
+  reviewUrl: string;
+  isStale: boolean;
+  reviewStatus: AclApprovalReviewStatus;
+};
+
+export type AclApprovalState =
+  | AclPendingApprovalState
+  | AclConcludedApprovalState;
 
 export async function getAclShipitStatusForCommits(
   repoAclFiles: IFile<OwnerAcl>[],
@@ -177,4 +182,90 @@ export async function getAclShipitStatusForCommits(
 
 export function isOwnerAclFile(acl: IFile<Acl>): acl is IFile<OwnerAcl> {
   return (acl.content as any).owners;
+}
+
+export function aclApprovalStateAsCheckRunParams(
+  aclResult: AclApprovalState,
+  isAclOverride: boolean,
+): Pick<
+  ChecksCreateParams,
+  'output' | 'conclusion' | 'details_url' | 'status'
+> {
+  let inProgress = aclResult.reviewStatus === 'PENDING';
+  let output: ChecksCreateParams['output'];
+  let conclusion: ChecksCreateParams['conclusion'];
+  let url: string | undefined;
+  const shortCommit =
+    aclResult.reviewStatus !== 'PENDING'
+      ? aclResult.reviewCommit.substr(0, 6)
+      : null;
+  switch (aclResult.reviewStatus) {
+    case 'PENDING':
+      output = { title: 'Still waiting on review', summary: '' };
+      break;
+    case 'APPROVED':
+      if (aclResult.isStale) {
+        output = {
+          summary: '',
+          title: `New changes after ${shortCommit} require re-approval`,
+        };
+        conclusion = 'action_required';
+      } else {
+        output = {
+          summary: '',
+          title: `Approved by @${aclResult.reviewer} at ${shortCommit}`,
+        };
+        conclusion = 'success';
+      }
+      url = aclResult.reviewUrl;
+      break;
+    case 'CHANGES_REQUESTED':
+      output = {
+        summary: '',
+        title: `Changes requested by @${aclResult.reviewer} at ${shortCommit}`,
+      };
+      conclusion = 'failure';
+      url = aclResult.reviewUrl;
+      break;
+    case 'DISMISSED':
+      output = {
+        summary: '',
+        title: `Dismissed review from @${aclResult.reviewer}`,
+      };
+      conclusion = 'cancelled';
+      url = aclResult.reviewUrl;
+      break;
+    case 'COMMENTED':
+      output = {
+        summary: '',
+        title: `Comment-only review by @${aclResult.reviewer} at ${shortCommit}`,
+      };
+      conclusion = 'failure';
+      url = aclResult.reviewUrl;
+      break;
+    default:
+      throw new UnreachableError(
+        aclResult,
+        `Unknown reivew status type: ${(aclResult as any).reviewStatus}`,
+      );
+  }
+  if (isAclOverride) {
+    if (
+      inProgress ||
+      (conclusion &&
+        ['failure', 'cancelled', 'action_required'].includes(conclusion))
+    ) {
+      inProgress = false;
+      output.title = `ACLOVERRIDE (was: ${conclusion || 'pending'} - ${
+        output.title
+      })`;
+      conclusion = 'neutral';
+    }
+  }
+  return {
+    output,
+    conclusion,
+    details_url: url,
+    status: inProgress ? 'in_progress' : 'completed',
+  };
 }
