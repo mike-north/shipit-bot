@@ -49,6 +49,7 @@ export function aclCheckRunName(aclResult: AclApprovalState): string {
 export function createCheckRunParamsForAclApprovals(
   aclAprovalsByState: Dict<AclApprovalState>,
   isAclOverride: boolean,
+  pullData: { owner: string; repo: string; pullNumber: number },
   suggestedReviewers: Dict<{ teams: string[]; users: string[] }>,
 ): Pick<
   ChecksCreateParams,
@@ -62,6 +63,7 @@ export function createCheckRunParamsForAclApprovals(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       aclAprovalsByState[aclName]!,
       isAclOverride,
+      pullData,
       suggestedReviewers[aclName],
     ),
   }));
@@ -308,7 +310,7 @@ async function updateAclStatusImpl(
   context.log.info(`ACL OVERRIDE ${aclOverrideFound ? '' : 'NOT '}DETECTED`);
   const requestedReviewers = await pReviewRequests;
   const requestedReviewerUsernames = requestedReviewers.users.map(u => u.login);
-  const requestedReviewerTeamnames = requestedReviewers.teams.map(t => t.name);
+  // const requestedReviewerTeamnames = requestedReviewers.teams.map(t => t.name);
   // We now have all the information we need, and know what to indicate for each ACL
 
   // Tell GitHub about the status of each ACL and the overall approval status of the PR
@@ -316,6 +318,7 @@ async function updateAclStatusImpl(
     ...createCheckRunParamsForAclApprovals(
       decidingAclActivities,
       aclOverrideFound,
+      { ...repoData, pullNumber: pull_request.number },
       pertinentAcls.reduce(
         (dict, aclFile) => {
           const aclName = aclFile.name;

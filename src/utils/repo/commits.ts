@@ -78,3 +78,7 @@ export async function getFileChangesForCommits(
     ),
   );
 }
+
+export function shortCommit(sha: string) {
+  return sha.substr(0, 6);
+}

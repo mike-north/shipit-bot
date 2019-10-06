@@ -25,9 +25,7 @@ export type AclApprovalConcludedReview = {
   status: AclApprovalReviewStatus;
   isStale: boolean;
 };
-export type AclApprovalReview =
-  | AclApprovalPendingReview
-  | AclApprovalConcludedReview;
+export type AclReview = AclApprovalPendingReview | AclApprovalConcludedReview;
 
 export type AclPendingApprovalState = IFile<OwnerAcl> & {
   review: AclApprovalPendingReview;
