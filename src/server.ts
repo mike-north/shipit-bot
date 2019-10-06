@@ -5,7 +5,7 @@ import { debounce } from './utils/debounce';
 const STANDARD_DEBOUNCE = 1000; // ms
 
 process.stdout.write('STARTING UP SHIPIT BOT\n');
-
+const handler = debounce(updateAclStatus, STANDARD_DEBOUNCE);
 const entry: ApplicationFunction = (app: Application): void => {
   app.log.info('Setting up');
   // app.on(`*`, async context => {
@@ -20,7 +20,12 @@ const entry: ApplicationFunction = (app: Application): void => {
       'pull_request_review',
       'issue_comment',
     ],
-    debounce(updateAclStatus, STANDARD_DEBOUNCE),
+    async context => {
+      context.log({ event: context.event, action: context.payload.action });
+      if (context.payload.action === 'review_requested') return;
+
+      await handler(context);
+    },
   );
 };
 
