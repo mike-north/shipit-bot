@@ -25,10 +25,9 @@ import {
   determineDecidingAclActivity,
   getReviewsForPullRequest,
 } from '../../utils/repo/reviews';
+import { createReviewRequestsForAcls } from '../../utils/review-requests';
 import { itemsWithCount } from '../../utils/ui-text';
 import { isPullRequestPaylod } from '../../utils/webhook-payloads';
-import OwnerAcl from '../../models/acl/owner';
-import { IFile } from '../../types';
 
 /**
  * Generate the name of an ACL approval check-run
@@ -50,10 +49,12 @@ export function aclCheckRunName(aclResult: AclApprovalState): string {
 export function createCheckRunParamsForAclApprovals(
   aclAprovalsByState: Dict<AclApprovalState>,
   isAclOverride: boolean,
+  suggestedReviewers: Dict<{ teams: string[]; users: string[] }>,
 ): Pick<
   ChecksCreateParams,
   Exclude<keyof ChecksCreateParams, 'owner' | 'repo' | 'head_sha'>
 >[] {
+  console.log({ suggestedReviewers });
   return Object.keys(aclAprovalsByState).map(aclName => ({
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     name: aclCheckRunName(aclAprovalsByState[aclName]!),
@@ -61,6 +62,7 @@ export function createCheckRunParamsForAclApprovals(
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       aclAprovalsByState[aclName]!,
       isAclOverride,
+      suggestedReviewers[aclName],
     ),
   }));
 }
@@ -175,130 +177,6 @@ function createOverallCheckRunParams(
   };
 }
 
-async function createReviewRequestsForAcls(
-  github: GitHubAPI,
-  repoInfo: { repo: string; owner: string },
-  prNumber: number,
-  prAuthorName: string,
-  aclFiles: IFile<OwnerAcl>[],
-  existingReviewerNames: string[],
-): Promise<void> {
-  // Get the current list of review requests
-  const reviewRequests = (await github.pulls.listReviewRequests({
-    ...repoInfo,
-    pull_number: prNumber,
-  })).data;
-  // Identify ACLs that still need a review request of some ort
-  const aclsRequringReviewRequests = aclFiles.filter(aclFile => {
-    const { content: acl } = aclFile;
-    // Name of the "real" GitHub team for ACL owners
-    const ownerTeamName =
-      !acl.team || typeof acl.team === 'string' ? acl.team : acl.team.owners;
-    // Name of the "proxy" GitHub team used by PullPanda
-    const proxyTeamName =
-      acl.team && typeof acl.team === 'object' ? acl.team.proxy : null;
-
-    /**
-     * Does the PR already have a team review request that corresponds to this ACL?
-     * Note: either the "real" or "proxy" team will do
-     */
-    const hasTeamReviewRequest =
-      ownerTeamName || proxyTeamName
-        ? !!reviewRequests.teams.find(
-            team =>
-              (ownerTeamName && team.name === ownerTeamName) ||
-              (proxyTeamName && team.name === proxyTeamName),
-          )
-        : false;
-    /**
-     * Does the PR already have a review request for one of this ACL's owners?
-     */
-    const hasIndividualReviewRequest = !!reviewRequests.users.find(rr =>
-      acl.owners.includes(rr.login),
-    );
-    /**
-     * Does the PR already have a review of some sort from one of this ACL's owners?
-     */
-    const hasIndividualReview = !!existingReviewerNames.find(reviewer =>
-      acl.owners.includes(reviewer),
-    );
-    /**
-     * If any of these three conditions are true, we don't need to do anything for this ACL
-     */
-    return (
-      !hasIndividualReview &&
-      !hasIndividualReviewRequest &&
-      !hasTeamReviewRequest
-    );
-  });
-  /**
-   * Accumulate a list of teams and individuals, to request a review from
-   */
-  const reviewersToRequest = aclsRequringReviewRequests.reduce(
-    (reqs, aclFile) => {
-      const { content: acl } = aclFile;
-      const ownerTeamName =
-        !acl.team || typeof acl.team === 'string' ? acl.team : acl.team.owners;
-
-      const proxyTeamName =
-        acl.team && typeof acl.team !== 'string' ? acl.team.proxy : null;
-      // No GitHub team specified to sync with the ACL's owners
-      if (!ownerTeamName) {
-        /**
-         * We'll have to request a review directly from ACL owners instead of a team
-         */
-        // If there's only one owner and it's the PR author, comment in the PR with a nice error
-        if (acl.owners.length === 1 && acl.owners[0] === prAuthorName) {
-          throw new UserInputError(
-            `ACL ${aclFile.name} only has the author of this pull request, ${prAuthorName} as an owner.
-Authors cannot approve their own code. Please add additional reviewers to the ACL`,
-          );
-        }
-        // If there are no owners in the ACL, comment in the PR
-        if (acl.owners.length === 0) {
-          throw new UserInputError(
-            `ACL ${aclFile.name} has no owners listed. Please add two or more owners`,
-          );
-        }
-        /**
-         * Now we know that there's at least one owner on the ACL that's NOT the PR author
-         * Let's get a list of valid reviewers by filtering the author out
-         */
-        const otherOwners = acl.owners.filter(o => o !== prAuthorName);
-
-        // Find a random reviewer
-        const randomReviewerIdx = Math.floor(
-          Math.random() * otherOwners.length,
-        );
-        // Add them to our "to ask" list
-        reqs.reviewers.push(otherOwners[randomReviewerIdx]);
-      } else if (proxyTeamName) {
-        // If a proxy team is listed, request a review from them
-        reqs.team_reviewers.push(proxyTeamName);
-      } else {
-        // Otherwise, request a review from the real team
-        reqs.team_reviewers.push(ownerTeamName);
-      }
-
-      return reqs;
-    },
-    {
-      team_reviewers: [] as string[],
-      reviewers: [] as string[],
-    },
-  );
-  console.log({ reviewersToRequest });
-  /**
-   * Actually create the review request. It's pretty nice that we can
-   * do this in a single API call
-   */
-  await github.pulls.createReviewRequest({
-    ...repoInfo,
-    pull_number: prNumber,
-    ...reviewersToRequest,
-  });
-}
-
 async function pullRequestFromPayload(
   github: GitHubAPI,
   payload:
@@ -374,6 +252,13 @@ async function updateAclStatusImpl(
   const repoOwnerAcls = (await pAcls).filter(isOwnerAclFile);
   context.log.info(`${repo} ACLs found`, repoOwnerAcls.map(a => a.name));
 
+  // Get the current list of review requests
+  const pReviewRequests = github.pulls
+    .listReviewRequests({
+      ...repoData,
+      pull_number: pull_request.number,
+    })
+    .then(resp => resp.data);
   /**
    * Walk through the commits associated with this pull request, examine
    * the files changed, which ACLs those files pertain to and the existing reviews.
@@ -402,13 +287,16 @@ async function updateAclStatusImpl(
     Object.keys(aclActivities).includes(acl.name),
   );
 
-  const pCreateReviewRequests = createReviewRequestsForAcls(
-    github,
-    repoData,
-    pull_request.number,
-    pull_request.user.login,
-    pertinentAcls,
-    reviews.map(r => r.user.login),
+  const pCreateReviewRequests = pReviewRequests.then(reviewRequests =>
+    createReviewRequestsForAcls(
+      github,
+      repoData,
+      pull_request.number,
+      pull_request.user.login,
+      pertinentAcls,
+      reviews.map(r => r.user.login),
+      reviewRequests,
+    ),
   );
 
   const decidingAclActivities = mapDict(
@@ -418,7 +306,9 @@ async function updateAclStatusImpl(
 
   const aclOverrideFound = await pAclOverrideFound;
   context.log.info(`ACL OVERRIDE ${aclOverrideFound ? '' : 'NOT '}DETECTED`);
-
+  const requestedReviewers = await pReviewRequests;
+  const requestedReviewerUsernames = requestedReviewers.users.map(u => u.login);
+  const requestedReviewerTeamnames = requestedReviewers.teams.map(t => t.name);
   // We now have all the information we need, and know what to indicate for each ACL
 
   // Tell GitHub about the status of each ACL and the overall approval status of the PR
@@ -426,6 +316,36 @@ async function updateAclStatusImpl(
     ...createCheckRunParamsForAclApprovals(
       decidingAclActivities,
       aclOverrideFound,
+      pertinentAcls.reduce(
+        (dict, aclFile) => {
+          const aclName = aclFile.name;
+          let aclData = dict[aclName];
+          const {
+            content: acl,
+            content: { owners },
+          } = aclFile;
+          if (!aclData) {
+            // eslint-disable-next-line no-param-reassign, no-multi-assign
+            dict[aclName] = aclData = { teams: [], users: [] };
+          }
+          const ownerTeamName =
+            !acl.team || typeof acl.team === 'string'
+              ? acl.team
+              : acl.team.owners;
+
+          const ownersAlreadyRequestedForReview = intersection(
+            owners,
+            requestedReviewerUsernames,
+          );
+          if (ownersAlreadyRequestedForReview.length > 0) {
+            aclData.users.push(...ownersAlreadyRequestedForReview);
+          } else if (ownerTeamName) {
+            aclData.teams.push(ownerTeamName);
+          }
+          return dict;
+        },
+        {} as Dict<{ teams: string[]; users: string[] }>,
+      ),
     ).map(async params => {
       await github.checks.create(
         context.repo({

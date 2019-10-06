@@ -1,21 +1,22 @@
-import { GitHubAPI } from 'probot/lib/github';
-import {
-  PullsListReviewsResponseItem,
-  ChecksCreateParams,
-} from '@octokit/rest';
 import { Dict } from '@mike-north/types';
-import { getRepoTextFiles } from './files';
-import { Acl, IFile, ICommitWithFileChanges, IChangedFile } from '../../types';
-import OwnerAcl from '../../models/acl/owner';
+import {
+  ChecksCreateParams,
+  PullsListReviewsResponseItem,
+} from '@octokit/rest';
+import { GitHubAPI } from 'probot/lib/github';
 import { yamlToAcl } from '../../models/acl';
-import UnreachableError from '../errors/unreachable';
+import OwnerAcl from '../../models/acl/owner';
+import { Acl, IChangedFile, IFile } from '../../types';
 import {
   AclApprovalReviewStatus,
   AclApprovalState,
-  AclPendingApprovalState,
   AclConcludedApprovalState,
+  AclPendingApprovalState,
 } from '../../types/acls';
+import UnreachableError from '../errors/unreachable';
+import { listWithOr } from '../ui-text';
 import { getFileChangesForCommits } from './commits';
+import { getRepoTextFiles } from './files';
 
 /**
  * Get the list of ACLs included in a specified repo
@@ -85,6 +86,7 @@ export function isOwnerAclFile(acl: IFile<Acl>): acl is IFile<OwnerAcl> {
 export function checkRunParamsFromAclApprovalState(
   aclResult: AclApprovalState,
   isAclOverride: boolean,
+  suggestedReviewers?: { teams: string[]; users: string[] },
 ): Pick<
   ChecksCreateParams,
   'output' | 'conclusion' | 'details_url' | 'status'
@@ -99,9 +101,16 @@ export function checkRunParamsFromAclApprovalState(
       : null;
   const { review } = aclResult;
   switch (review.status) {
-    case 'PENDING':
-      output = { title: 'Still waiting for review', summary: '' };
+    case 'PENDING': {
+      let title = 'Pending review';
+      if (suggestedReviewers && suggestedReviewers.users.length > 0) {
+        title = `Pending review from ${listWithOr(suggestedReviewers.users)}`;
+      } else if (suggestedReviewers && suggestedReviewers.teams.length > 0) {
+        title = `Pending review from ${listWithOr(suggestedReviewers.teams)}`;
+      }
+      output = { title, summary: '' };
       break;
+    }
     case 'APPROVED':
       if (review.isStale) {
         output = {
