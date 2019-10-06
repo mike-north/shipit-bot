@@ -3,6 +3,7 @@ import {
   ChecksCreateParams,
   PullsListReviewsResponseItem,
 } from '@octokit/rest';
+import { chunk } from 'lodash';
 import { GitHubAPI } from 'probot/lib/github';
 import { yamlToAcl } from '../../models/acl';
 import OwnerAcl from '../../models/acl/owner';
@@ -15,7 +16,7 @@ import {
 } from '../../types/acls';
 import UnreachableError from '../errors/unreachable';
 import { listWithOr } from '../ui-text';
-import { getFileChangesForCommits } from './commits';
+import { getFileChangesForCommits, shortCommit } from './commits';
 import { getRepoTextFiles } from './files';
 
 /**
@@ -76,6 +77,71 @@ export function isOwnerAclFile(acl: IFile<Acl>): acl is IFile<OwnerAcl> {
   return (acl.content as any).owners;
 }
 
+function stringifyReview(
+  review: AclApprovalState['review'],
+  pullData: { owner: string; repo: string; pullNumber: number },
+): string {
+  if (review.status === 'PENDING')
+    return 'No owner from this ACL has reviewed this pull request yet';
+  const shortSha = shortCommit(review.sha);
+  const mdUser = `[\`@${review.user}\`](https://github.com/${review.user})`;
+  if (review.status === 'DISMISSED')
+    return `${mdUser}'s [review on commit \`${shortSha}\`](${review.url}) was *dismissed*. You'll need another review from one of this ACL's owners`;
+  if (review.status === 'COMMENTED')
+    return `${mdUser}'s [review on commit \`${shortSha}\`](${review.url}) indicated neither "approval" nor "changes requested". They, or another of this ACL's owners will need to indicate approval of this code change.`;
+  if (review.status === 'CHANGES_REQUESTED')
+    return `${mdUser}'s [review on commit \`${shortSha}\`](${review.url}) indicated that they would like to see some changes before approving this pull request.`;
+  if (review.status === 'APPROVED') {
+    let message = `${mdUser} approved this code change [on commit \`${shortSha}\`](${review.url})`;
+    if (review.isStale) {
+      message = `${message}, but [additional code changes have been added since then](https://github.com/${pullData.owner}/${pullData.repo}/pull/${pullData.pullNumber}/files/${review.sha}..HEAD). You'll need a re-review.`;
+    }
+    return message;
+  }
+  throw new UnreachableError(
+    review.status,
+    `Unhandled review status: ${review.status}`,
+  );
+}
+
+function buildCheckRunSummaryForAcl(
+  aclResult: AclApprovalState,
+  pullData: { owner: string; repo: string; pullNumber: number },
+): string {
+  const aclName = aclResult.content.description || aclResult.name;
+  const contentItems: string[] = [];
+  contentItems.push(
+    `_File:_ [\`./acls/${aclResult.name}\`](https://github.com/${pullData.owner}/${pullData.repo}/blob/master/acls/${aclResult.name})`,
+  );
+
+  contentItems.push(`_Paths:_ \`${aclResult.content.paths}\``);
+  contentItems.push(
+    `_Reason for current status:_ ${stringifyReview(
+      aclResult.review,
+      pullData,
+    )}`,
+  );
+  contentItems.push(`_Reviewers:_\n\n
+| | | |
+|:-------------------------:|:-------------------------:|:-------------------------:|
+${chunk(aclResult.content.owners, 3)
+  .map(
+    row =>
+      `| ${row
+        .map(
+          item =>
+            `<a href="https://github.com/${item}" target="_blank"><img width="1024" src="https://github.com/${item}.png">  <code>@${item}</code></a>`,
+        )
+        .join(' | ')} |`,
+  )
+  .join('\n')}\n\n
+`);
+  return `### ACL: ${aclName}
+
+---
+${contentItems.join('\n\n')}
+`;
+}
 /**
  * Given an ACL approval state, generate partial ChecksCreateParams, for the
  * purpose of creating an ACL-specific CheckRun on GitHub
@@ -86,68 +152,55 @@ export function isOwnerAclFile(acl: IFile<Acl>): acl is IFile<OwnerAcl> {
 export function checkRunParamsFromAclApprovalState(
   aclResult: AclApprovalState,
   isAclOverride: boolean,
+  pullData: { owner: string; repo: string; pullNumber: number },
   suggestedReviewers?: { teams: string[]; users: string[] },
 ): Pick<
   ChecksCreateParams,
   'output' | 'conclusion' | 'details_url' | 'status'
 > {
   let inProgress = aclResult.review.status === 'PENDING';
-  let output: ChecksCreateParams['output'];
   let conclusion: ChecksCreateParams['conclusion'];
   let url: string | undefined;
-  const shortCommit =
+  const shortSha =
     aclResult.review.status !== 'PENDING'
       ? aclResult.review.sha.substr(0, 6)
       : null;
   const { review } = aclResult;
+  let title!: string;
+  const summary = buildCheckRunSummaryForAcl(aclResult, pullData);
+
   switch (review.status) {
     case 'PENDING': {
-      let title = 'Pending review';
+      title = 'Pending review';
       if (suggestedReviewers && suggestedReviewers.users.length > 0) {
         title = `Pending review from ${listWithOr(suggestedReviewers.users)}`;
       } else if (suggestedReviewers && suggestedReviewers.teams.length > 0) {
         title = `Pending review from ${listWithOr(suggestedReviewers.teams)}`;
       }
-      output = { title, summary: '' };
       break;
     }
     case 'APPROVED':
       if (review.isStale) {
-        output = {
-          summary: '',
-          title: `New changes after ${shortCommit} require re-approval`,
-        };
+        title = `New changes after ${shortSha} require re-approval`;
         conclusion = 'action_required';
       } else {
-        output = {
-          summary: '',
-          title: `Approved by @${review.user} at ${shortCommit}`,
-        };
+        title = `Approved by @${review.user} at ${shortSha}`;
         conclusion = 'success';
       }
       url = review.url;
       break;
     case 'CHANGES_REQUESTED':
-      output = {
-        summary: '',
-        title: `Changes requested by @${review.user} at ${shortCommit}`,
-      };
+      title = `Changes requested by @${review.user} at ${shortSha}`;
       conclusion = 'failure';
       url = review.url;
       break;
     case 'DISMISSED':
-      output = {
-        summary: '',
-        title: `Dismissed review from @${review.user}`,
-      };
+      title = `Dismissed review from @${review.user}`;
       conclusion = 'cancelled';
       url = review.url;
       break;
     case 'COMMENTED':
-      output = {
-        summary: '',
-        title: `Comment-only review by @${review.user} at ${shortCommit}`,
-      };
+      title = `Comment-only review by @${review.user} at ${shortSha}`;
       conclusion = 'failure';
       url = review.url;
       break;
@@ -168,14 +221,12 @@ export function checkRunParamsFromAclApprovalState(
         ['failure', 'cancelled', 'action_required'].includes(conclusion))
     ) {
       inProgress = false;
-      output.title = `ACLOVERRIDE (was: ${conclusion || 'pending'} - ${
-        output.title
-      })`;
+      title = `ACLOVERRIDE (was: ${conclusion || 'pending'} - ${title})`;
       conclusion = 'neutral';
     }
   }
   return {
-    output,
+    output: { title, summary },
     conclusion,
     details_url: url,
     status: inProgress ? 'in_progress' : 'completed',
