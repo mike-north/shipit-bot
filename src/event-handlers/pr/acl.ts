@@ -1,42 +1,102 @@
-import * as Webhooks from '@octokit/webhooks';
-import { Context, Octokit } from 'probot';
 import { Dict } from '@mike-north/types';
 import { ChecksCreateParams, ChecksUpdateParams } from '@octokit/rest';
+import * as Webhooks from '@octokit/webhooks';
+import { flatMap, groupBy } from 'lodash';
+import { Context, Octokit } from 'probot';
 import { GitHubAPI } from 'probot/lib/github';
 import {
-  getAclsForRepo,
-  getAclShipitStatusForCommits,
-  isOwnerAclFile,
+  AclApprovalReviewStatus,
   AclApprovalState,
-  aclApprovalStateAsCheckRunParams,
   AclConcludedApprovalState,
   AclPendingApprovalState,
+} from '../../types/acls';
+import { mapDict, reduceDict } from '../../utils/dict';
+import {
+  checkRunParamsFromAclApprovalState,
+  getAclsForRepo,
+  getPertinentFilesAndAclsForCommitList,
+  isOwnerAclFile,
 } from '../../utils/repo/acl';
-import { getCommitHistoryForPullRequest } from '../../utils/repo/pull-request';
-import { getFileChangesForCommits } from '../../utils/repo/commits';
-import { getReviewsForPullRequest } from '../../utils/repo/reviews';
-import { itemsWithCount } from '../../utils/ui-text';
 import { isAclOverrideFound } from '../../utils/repo/issues';
+import { getCommitHistoryForPullRequest } from '../../utils/repo/pull-request';
+import {
+  determineDecidingAclActivity,
+  getReviewsForPullRequest,
+} from '../../utils/repo/reviews';
+import { itemsWithCount } from '../../utils/ui-text';
 import { isPullRequestPaylod } from '../../utils/webhook-payloads';
 
-function createAclCheckRunParams(
+/**
+ * Generate the name of an ACL approval check-run
+ * @param aclResult ACL approval state
+ * @private
+ */
+export function aclCheckRunName(aclResult: AclApprovalState): string {
+  return `ACL: ${aclResult.content.description || aclResult.name}`;
+}
+
+/**
+ * Create an array of `ChecksCreateParams` objects corresponding
+ * to ACL approvals
+ *
+ * @param aclAprovalsByState ACL approvals, bucketed by approval state
+ * @param isAclOverride whether an `ACLOVERRIDE` signal has been detected
+ * @private
+ */
+export function createCheckRunParamsForAclApprovals(
   aclAprovalsByState: Dict<AclApprovalState>,
-  sha: string,
   isAclOverride: boolean,
 ): Pick<
   ChecksCreateParams,
-  Exclude<keyof ChecksCreateParams, 'owner' | 'repo'>
+  Exclude<keyof ChecksCreateParams, 'owner' | 'repo' | 'head_sha'>
 >[] {
-  return Object.keys(aclAprovalsByState).map(aclName => {
+  return Object.keys(aclAprovalsByState).map(aclName => ({
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    const aclResult = aclAprovalsByState[aclName]!;
+    name: aclCheckRunName(aclAprovalsByState[aclName]!),
+    ...checkRunParamsFromAclApprovalState(
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      aclAprovalsByState[aclName]!,
+      isAclOverride,
+    ),
+  }));
+}
 
-    return {
-      name: `ACL: ${aclResult.content.description || aclName}`,
-      head_sha: sha,
-      ...aclApprovalStateAsCheckRunParams(aclResult, isAclOverride),
-    };
-  });
+type BucketedAclApprovals = {
+  PENDING: AclPendingApprovalState[] | undefined;
+} & Record<AclApprovalReviewStatus, AclConcludedApprovalState[] | undefined>;
+
+function bucketAclApprovals(
+  aclAprovalsByState: Dict<AclApprovalState>,
+): BucketedAclApprovals {
+  return reduceDict(
+    aclAprovalsByState,
+    (bins, aclResult) => {
+      const {
+        review: { status },
+      } = aclResult;
+      const existingStatusList = bins[status];
+      if (existingStatusList) {
+        if (status === 'PENDING')
+          (existingStatusList as AclPendingApprovalState[]).push(
+            aclResult as AclPendingApprovalState,
+          );
+        else
+          (existingStatusList as AclConcludedApprovalState[]).push(
+            aclResult as AclConcludedApprovalState,
+          );
+      } else {
+        // eslint-disable-next-line no-param-reassign
+        (bins[status] as (
+          | AclPendingApprovalState
+          | AclConcludedApprovalState)[]) = [
+          aclResult as AclPendingApprovalState | AclConcludedApprovalState,
+        ];
+      }
+      return bins;
+    },
+
+    {} as BucketedAclApprovals,
+  );
 }
 
 function createOverallCheckRunParams(
@@ -46,44 +106,10 @@ function createOverallCheckRunParams(
   ChecksUpdateParams,
   Exclude<keyof ChecksUpdateParams, 'check_run_id' | 'owner' | 'repo'>
 > {
-  const aclBins = Object.keys(aclAprovalsByState).reduce(
-    (bins, aclName) => {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      const aclResult = aclAprovalsByState[aclName]!;
-      const existingStatusList = bins[aclResult.reviewStatus];
-      if (existingStatusList) {
-        if (aclResult.reviewStatus === 'PENDING')
-          (existingStatusList as AclPendingApprovalState[]).push(
-            aclResult as AclPendingApprovalState,
-          );
-        else
-          (existingStatusList as AclConcludedApprovalState[]).push(
-            aclResult as AclConcludedApprovalState,
-          );
-      } else if (aclResult.reviewStatus === 'PENDING') {
-        // eslint-disable-next-line no-param-reassign
-        (bins[aclResult.reviewStatus] as AclPendingApprovalState[]) = [
-          aclResult as AclPendingApprovalState,
-        ];
-      } else {
-        // eslint-disable-next-line no-param-reassign
-        (bins[aclResult.reviewStatus] as AclConcludedApprovalState[]) = [
-          aclResult as AclConcludedApprovalState,
-        ];
-      }
-      return bins;
-    },
-
-    {} as Record<
-      Exclude<AclApprovalState['reviewStatus'], 'PENDING'>,
-      AclConcludedApprovalState[] | undefined
-    > &
-      Record<'PENDING', AclPendingApprovalState[] | undefined>,
-  );
-
+  const aclBins = bucketAclApprovals(aclAprovalsByState);
   const [approvedFresh, approvedStale] = (aclBins.APPROVED || []).reduce(
     ([fresh, stale], item) => {
-      if (item.isStale) return [fresh, [...stale, item]];
+      if (item.review.isStale) return [fresh, [...stale, item]];
       return [[...fresh, item], stale];
     },
     [[], []] as [AclConcludedApprovalState[], AclConcludedApprovalState[]],
@@ -203,13 +229,6 @@ export async function updateAclStatus(
     pull_request.number,
   );
 
-  // For our list of commits, obtain data around which files were changed
-  const pCommitData = getFileChangesForCommits(
-    github,
-    owner,
-    repo,
-    await pCommits,
-  );
   // TODO: handle release owner ACLs. We just discard them here
   const repoOwnerAcls = (await pAcls).filter(isOwnerAclFile);
   context.log.info(`${repo} ACLs found`, repoOwnerAcls.map(a => a.name));
@@ -219,26 +238,37 @@ export async function updateAclStatus(
    * the files changed, which ACLs those files pertain to and the existing reviews.
    *
    * Determine the "approval outcome" of each ACL, for each commit
+   *
    */
-  const commitsWithApprovalStatuses = await getAclShipitStatusForCommits(
+  const commitsWithChangedFilesAndApprovals = await getPertinentFilesAndAclsForCommitList(
+    github,
+    await pCommits,
     repoOwnerAcls,
-    await pCommitData,
     await pReviews,
+    repoData,
   );
 
   /**
-   * Iterate over the commits, from HEAD backwards and accumulate
-   * the _most recent signal that pertains to each ACL_.
+   * Group the activities in the sequence of commits by ACL
    */
-  const aclAprovalsByState = commitsWithApprovalStatuses.reduceRight(
-    (aclDict, thisCommitWithStatus) => {
-      thisCommitWithStatus.acls.forEach(acl => {
-        if (acl.name in aclDict) return;
-        Object.assign(aclDict, { [acl.name]: acl });
-      });
-      return aclDict;
-    },
-    {} as Dict<AclApprovalState>,
+  const aclActivities = groupBy(
+    flatMap(commitsWithChangedFilesAndApprovals, c => c.acls),
+    acl => acl.name,
+  );
+
+  const REVIEW_STATUS_SIGNAL_STRENGTH: {
+    [K in AclApprovalState['review']['status']]: number;
+  } = {
+    PENDING: 1,
+    DISMISSED: 3,
+    COMMENTED: 5,
+    APPROVED: 10,
+    CHANGES_REQUESTED: 10,
+  };
+
+  const decidingAclActivities = mapDict(
+    aclActivities,
+    determineDecidingAclActivity,
   );
 
   const aclOverrideFound = await pAclOverrideFound;
@@ -248,18 +278,25 @@ export async function updateAclStatus(
 
   // Tell GitHub about the status of each ACL and the overall approval status of the PR
   await Promise.all([
-    ...createAclCheckRunParams(
-      aclAprovalsByState,
-      pull_request.head.sha,
+    ...createCheckRunParamsForAclApprovals(
+      decidingAclActivities,
       aclOverrideFound,
     ).map(async params => {
-      await github.checks.create(context.repo(params));
+      await github.checks.create(
+        context.repo({
+          ...params,
+          head_sha: pull_request.head.sha,
+        }),
+      );
     }),
     github.checks
       .update(
         context.repo({
           check_run_id: (await pMainCheck).data.id,
-          ...createOverallCheckRunParams(aclAprovalsByState, aclOverrideFound),
+          ...createOverallCheckRunParams(
+            decidingAclActivities,
+            aclOverrideFound,
+          ),
         }),
       )
       .then(() => {}),

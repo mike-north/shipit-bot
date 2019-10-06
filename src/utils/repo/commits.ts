@@ -32,8 +32,8 @@ export async function getFileChangesForCommits(
   owner: string,
   repo: string,
   commitList: string[],
-): Promise<ICommitWithFileChanges[]> {
-  const commitDetails = await Promise.all(
+): Promise<{ sha: string; files: IChangedFile[] }[]> {
+  return await Promise.all(
     /**
      * Having to make an individual API call per commit to get the
      * files added/deleted/changed is not great, but it's currently
@@ -49,31 +49,32 @@ export async function getFileChangesForCommits(
      *  for N commits, potentially all in parallel. For PRs with large
      *  numbers of commits, this is likely to trigger abuse detection
      */
-    commitList.map(async sha => {
-      const resp = await github.repos.getCommit({ repo, owner, ref: sha });
-      const {
-        data: { files },
-      } = resp;
-      return {
-        sha,
-        files: files.map(
-          ({
-            filename,
-            status,
-            additions,
-            deletions,
-            changes,
-          }: Octokit.ReposGetCommitResponseFilesItem) =>
+    commitList.map(
+      async (sha): Promise<{ sha: string; files: IChangedFile[] }> => {
+        const resp = await github.repos.getCommit({ repo, owner, ref: sha });
+        const {
+          data: { files },
+        } = resp;
+        return {
+          sha,
+          files: files.map(
             ({
               filename,
               status,
               additions,
               deletions,
               changes,
-            } as IChangedFile),
-        ),
-      };
-    }),
+            }: Octokit.ReposGetCommitResponseFilesItem) =>
+              ({
+                filename,
+                status,
+                additions,
+                deletions,
+                changes,
+              } as IChangedFile),
+          ),
+        };
+      },
+    ),
   );
-  return commitDetails;
 }

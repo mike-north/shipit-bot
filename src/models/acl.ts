@@ -65,7 +65,7 @@ function parseYaml(yamlText: string): PartialAcl {
  *
  * @note any extraneous data that's not discussed in the {@link https://iwww.corp.linkedin.com/wiki/cf/display/TOOLS/Source+Code+ACLs+Cheat+Sheet | ACL file format documentation} will be discarded
  */
-export function createAcl(yamlText: string): OwnerAcl | ReleaseOwnerAcl {
+export function yamlToAcl(yamlText: string): OwnerAcl | ReleaseOwnerAcl {
   const data = parseYaml(yamlText);
   const { release_owners, owners } = data;
   if (owners) {

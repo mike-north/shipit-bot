@@ -11,6 +11,7 @@
     "prettier/@typescript-eslint"
   ],
   "rules": {
+    "no-return-await": 0,
     "import/no-extraneous-dependencies": 0,
     "import/prefer-default-export": 0,
     "@typescript-eslint/no-explicit-any": 0,
