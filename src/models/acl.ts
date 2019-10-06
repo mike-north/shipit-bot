@@ -33,6 +33,19 @@ const ACL_DATA_SCHEMA = {
       type: 'array',
       items: { type: 'string' },
     },
+    team: {
+      oneOf: [
+        { type: 'string' },
+        {
+          type: 'object',
+          properties: {
+            owners: { type: 'string' },
+            proxy: { type: 'string' },
+          },
+          required: ['owners'],
+        },
+      ],
+    },
   },
   required: ['paths'],
 };

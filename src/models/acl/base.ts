@@ -11,6 +11,14 @@ export interface IAclBase {
   description?: string;
   block_message?: string;
   groups?: string[];
+
+  // Extra metadata
+  team?:
+    | string
+    | {
+        owners: string;
+        proxy: string;
+      };
 }
 
 export default abstract class AclBase implements IAclBase {
@@ -26,6 +34,8 @@ export default abstract class AclBase implements IAclBase {
 
   groups?: string[];
 
+  team?: string | { owners: string; proxy: string };
+
   abstract kind: 'owner' | 'release_owner';
 
   protected pathRegexes: RegExp[];
@@ -39,6 +49,7 @@ export default abstract class AclBase implements IAclBase {
     if (arg.description) this.description = arg.description;
     if (arg.block_message) this.block_message = arg.block_message;
     if (arg.groups) this.groups = arg.groups;
+    if (arg.team) this.team = arg.team;
     this.pathRegexes = this.paths.map(p => new RegExp(p));
   }
 

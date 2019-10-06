@@ -11,6 +11,8 @@ import {
   AclPendingApprovalState,
 } from '../../types/acls';
 import { mapDict, reduceDict } from '../../utils/dict';
+import UserInputError from '../../utils/errors/user-input-error';
+import { syncAclsWithTeams } from '../../utils/org/team';
 import {
   checkRunParamsFromAclApprovalState,
   getAclsForRepo,
@@ -187,7 +189,7 @@ async function pullRequestFromPayload(
   })).data;
 }
 
-export async function updateAclStatus(
+async function updateAclStatusImpl(
   context: Context<
     Webhooks.WebhookPayloadPullRequest | Webhooks.WebhookPayloadIssueComment
   >,
@@ -214,7 +216,15 @@ export async function updateAclStatus(
   );
   context.log.info(`Getting ACLs for Repo: ${repo}`);
   // Get the ACLs pertaining to this repo
-  const pAcls = getAclsForRepo(github, owner, repo);
+  const pAcls = getAclsForRepo(github, owner, repo).then(acls => {
+    if (acls.length === 0)
+      throw new UserInputError('No ACLs found in this repository');
+    return acls;
+  });
+  const pAclSync = pAcls.then(aclFiles =>
+    syncAclsWithTeams(github, owner, repo, aclFiles.filter(isOwnerAclFile)),
+  );
+
   const pReviews = getReviewsForPullRequest(
     github,
     owner,
@@ -256,16 +266,6 @@ export async function updateAclStatus(
     acl => acl.name,
   );
 
-  const REVIEW_STATUS_SIGNAL_STRENGTH: {
-    [K in AclApprovalState['review']['status']]: number;
-  } = {
-    PENDING: 1,
-    DISMISSED: 3,
-    COMMENTED: 5,
-    APPROVED: 10,
-    CHANGES_REQUESTED: 10,
-  };
-
   const decidingAclActivities = mapDict(
     aclActivities,
     determineDecidingAclActivity,
@@ -301,4 +301,33 @@ export async function updateAclStatus(
       )
       .then(() => {}),
   ]);
+
+  await pAclSync;
+}
+
+export async function updateAclStatus(
+  context: Context<
+    Webhooks.WebhookPayloadPullRequest | Webhooks.WebhookPayloadIssueComment
+  >,
+): Promise<void> {
+  try {
+    await updateAclStatusImpl(context);
+  } catch (err) {
+    if (err instanceof UserInputError) {
+      const body = `### ACL validation had a problem
+This may be a problem with your repository's configuration, including the files in your \`acl\` folder.
+
+> ${err.message}`;
+      const existingComments = (await context.github.issues.listComments(
+        context.issue(),
+      )).data.filter(c => c.body === body);
+      if (existingComments.length === 0) {
+        await context.github.issues.createComment(
+          context.issue({
+            body,
+          }),
+        );
+      }
+    } else throw err;
+  }
 }
