@@ -10,7 +10,7 @@ import { IFile } from '../../types';
  * @internal
  */
 const REPO_FILES_GQL_EXTENSION = gql`
-  repoFiles($owner: String!, $repo: String!, $expression: String!) {
+  query repoFiles($owner: String!, $repo: String!, $expression: String!) {
     repository(owner: $owner, name: $repo) {
       content: object(expression: $expression) {
         ... on Blob {
@@ -18,6 +18,7 @@ const REPO_FILES_GQL_EXTENSION = gql`
         }
         ... on Tree {
           entries {
+            name
             ... on TreeEntry {
               name
               object {

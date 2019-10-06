@@ -1,14 +1,14 @@
-import { createAcl } from '../../../src/models/acl';
+import { yamlToAcl } from '../../../src/models/acl';
 
 QUnit.module('Parsing ACLs from YAML text', _hooks => {
   QUnit.test('invalid YAML', assert => {
     assert.throws(() => {
-      const acl = createAcl(`foo: []`);
+      const acl = yamlToAcl(`foo: []`);
     }, /requires property "paths"/);
   });
 
   QUnit.test('parsing "owner ACL" text', assert => {
-    const acl = createAcl(`paths: [abc/*]
+    const acl = yamlToAcl(`paths: [abc/*]
 owners: [mike-north]
 `);
     assert.ok(acl, 'ACL is created');
@@ -16,7 +16,7 @@ owners: [mike-north]
   });
 
   QUnit.test('parsing "release_owner ACL" text', assert => {
-    const acl = createAcl(`paths: [abc/*]
+    const acl = yamlToAcl(`paths: [abc/*]
 release_owners: [mike-north]
 `);
     assert.ok(acl, 'ACL is created');
