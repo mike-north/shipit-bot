@@ -39,7 +39,7 @@ QUnit.module('File utilities', hooks => {
       'mike-north',
       'shipit-bot',
       'master',
-      'acls/*',
+      'acl/*',
     );
     assert.equal(files.length, 1, 'One file');
     assert.equal(files[0].name, 'abc.txt', 'File name is correct');
