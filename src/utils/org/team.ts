@@ -17,7 +17,7 @@ async function syncAclWithTeam(
 ): Promise<void> {
   const { content: acl } = aclFile;
   // Link to this ACL (github "view source" page) in markdown, for later use
-  const mdAclLink = `[\`./acls/${aclFile.name}\`](https://github.com/${org}/${repo}/blob/master/acls/${aclFile.name})`;
+  const mdAclLink = `[\`./acl/${aclFile.name}\`](https://github.com/${org}/${repo}/blob/master/acl/${aclFile.name})`;
   if (!acl.team) return; // no team specified, nothing to sync
 
   // Get the team name, as specified in the ACL file

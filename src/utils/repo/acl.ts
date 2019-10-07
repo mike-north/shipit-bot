@@ -33,7 +33,7 @@ export async function getAclsForRepo(
   owner: string,
   repo: string,
 ): Promise<IFile<Acl>[]> {
-  const files = await getRepoTextFiles(github, owner, repo, 'master', 'acls/');
+  const files = await getRepoTextFiles(github, owner, repo, 'master', 'acl/');
   return files.map(({ name, content }) => ({
     name,
     content: yamlToAcl(content),
@@ -111,7 +111,7 @@ function buildCheckRunSummaryForAcl(
   const aclName = aclResult.content.description || aclResult.name;
   const contentItems: string[] = [];
   contentItems.push(
-    `_File:_ [\`./acls/${aclResult.name}\`](https://github.com/${pullData.owner}/${pullData.repo}/blob/master/acls/${aclResult.name})`,
+    `_File:_ [\`./acl/${aclResult.name}\`](https://github.com/${pullData.owner}/${pullData.repo}/blob/master/acl/${aclResult.name})`,
   );
 
   contentItems.push(`_Paths:_ \`${aclResult.content.paths}\``);
